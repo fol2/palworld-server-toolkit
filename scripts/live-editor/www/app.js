@@ -261,7 +261,7 @@ function selectPlayer(name) {
 }
 
 function updateAllTargetDropdowns() {
-    const ids = ['give-target', 'spawn-target', 'tp-player', 'world-target'];
+    const ids = ['give-target', 'spawn-target', 'tp-player', 'qt-player', 'world-target'];
     ids.forEach(id => {
         const sel = document.getElementById(id);
         if (!sel) return;
@@ -621,7 +621,8 @@ function modUnfreezePlayer() {
 
 /* Teleport */
 function bringSelectedPlayer() {
-    const name = state.selectedPlayer || document.getElementById('tp-player').value;
+    const qtSel = document.getElementById('qt-player');
+    const name = (qtSel && qtSel.value) || state.selectedPlayer;
     if (!name) { addLog('No player selected', 'err'); return; }
     sendCommand('bring_player',
         { target_player: name },
@@ -629,7 +630,9 @@ function bringSelectedPlayer() {
 }
 
 function gotoSelectedPlayer() {
-    const p = state.players.find(pl => pl.name === state.selectedPlayer);
+    const qtSel = document.getElementById('qt-player');
+    const targetName = (qtSel && qtSel.value) || state.selectedPlayer;
+    const p = state.players.find(pl => pl.name === targetName);
     if (!p) { addLog('No player selected', 'err'); return; }
     if (p.location_x == null || p.location_y == null) {
         addLog('No coordinates available for ' + p.name + ' (need REST API)', 'err');
@@ -807,7 +810,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Target dropdown sync
-    const targetIds = ['give-target', 'spawn-target', 'tp-player', 'world-target'];
+    const targetIds = ['give-target', 'spawn-target', 'tp-player', 'qt-player', 'world-target'];
     targetIds.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
