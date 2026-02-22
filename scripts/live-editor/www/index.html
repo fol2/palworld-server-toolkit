@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Palworld Live Editor</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Status Bar -->
+    <header id="status-bar">
+        <span class="server-name" id="server-name">Palworld Server</span>
+        <span id="status-indicator">
+            <span id="status-dot" class="dot stopped"></span>
+            <span id="status-text">CHECKING...</span>
+            <span id="player-count" class="dim"></span>
+            <span id="source-badge" class="source-badge" title="Player data source"></span>
+        </span>
+    </header>
+
+    <!-- Main Grid -->
+    <main class="grid">
+        <!-- Left Column -->
+        <div class="col-left">
+            <!-- Players Panel -->
+            <section class="panel" id="panel-players">
+                <h2>PLAYERS</h2>
+                <div id="player-list" class="scroll-list">
+                    <div class="empty-state">Connecting...</div>
+                </div>
+                <div id="player-detail" class="player-detail hidden"></div>
+                <div class="panel-footer dim">
+                    Auto-refresh: <span id="refresh-countdown">15</span>s
+                </div>
+            </section>
+
+            <!-- Spawn Pal Panel -->
+            <section class="panel" id="panel-spawn">
+                <h2>SPAWN PAL</h2>
+                <label>Target
+                    <select id="spawn-target" class="input-select"></select>
+                </label>
+                <label>Search
+                    <input type="text" id="spawn-search" class="input-text" placeholder="Filter pals...">
+                </label>
+                <div id="pal-list" class="scroll-list tall">
+                    <div class="empty-state">Loading pals...</div>
+                </div>
+                <div class="inline-group">
+                    <label class="short">Level
+                        <input type="number" id="spawn-level" class="input-text" value="50" min="1" max="55">
+                    </label>
+                    <button id="btn-spawn" class="btn btn-primary" disabled>Spawn Pal</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- Right Column -->
+        <div class="col-right">
+            <!-- Give Item Panel -->
+            <section class="panel" id="panel-give">
+                <h2>GIVE ITEM</h2>
+                <label>Target
+                    <select id="give-target" class="input-select"></select>
+                </label>
+                <label>Search
+                    <input type="text" id="give-search" class="input-text" placeholder="Filter items...">
+                </label>
+                <div id="item-list" class="scroll-list tall">
+                    <div class="empty-state">Loading items...</div>
+                </div>
+                <div class="inline-group">
+                    <label class="short">Qty
+                        <input type="number" id="give-qty" class="input-text" value="1" min="1" max="9999">
+                    </label>
+                    <button id="btn-give" class="btn btn-primary" disabled>Give Item</button>
+                </div>
+            </section>
+
+            <!-- Command Log Panel -->
+            <section class="panel" id="panel-log">
+                <h2>COMMAND LOG</h2>
+                <div id="command-log" class="scroll-list log-list">
+                    <div class="empty-state">No commands yet</div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Quick RCON Bar -->
+    <footer id="rcon-bar">
+        <button class="btn btn-sm" onclick="rconCmd('Save')">Save</button>
+        <button class="btn btn-sm" onclick="rconCmd('Info')">Info</button>
+        <button class="btn btn-sm" onclick="rconBroadcast()">Broadcast...</button>
+        <div class="rcon-custom">
+            <input type="text" id="rcon-input" class="input-text" placeholder="Custom RCON command...">
+            <button class="btn btn-sm" onclick="rconCustom()">Send</button>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>

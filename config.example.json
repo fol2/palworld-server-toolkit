@@ -1,0 +1,11 @@
+{
+  "server_name": "My Palworld Server",
+  "admin_password": "CHANGE_ME",
+  "admin_uid": "YOUR_PLAYER_UID_HERE",
+  "rcon_port": 25575,
+  "rest_api_port": 8212,
+  "live_editor_port": 8213,
+  "server_port": 8211,
+  "public_ip": "",
+  "server_dir": "server"
+}
