@@ -28,6 +28,7 @@ $script:WwwDir = [System.IO.Path]::GetFullPath((Join-Path $script:BaseDir "live-
 $script:IpcDir = Join-Path $script:BaseDir "live-editor"
 $script:CmdFile = Join-Path $script:IpcDir "commands.json"
 $script:RspFile = Join-Path $script:IpcDir "responses.json"
+$script:WaypointsFile = Join-Path $script:IpcDir "waypoints.json"
 
 # ── Dot-source RCON client ──────────────────────────────────────────────────────
 . (Join-Path $script:BaseDir "rcon-client.ps1")
@@ -476,7 +477,8 @@ function Handle-Request {
 
             # Build params, only include non-null values
             $params = @{}
-            @('target_player','item_id','quantity','pal_id','level','message') | ForEach-Object {
+            @('target_player','item_id','quantity','pal_id','level','message',
+              'amount','enable','x','y','z','hour','reason') | ForEach-Object {
                 $val = $cmdData.$_
                 if ($null -ne $val) { $params[$_] = $val }
             }
@@ -507,6 +509,195 @@ function Handle-Request {
                 success = $success
                 result  = $result
             } | ConvertTo-Json
+            Send-JsonResponse $rsp $body
+            return
+        }
+
+        # ── Waypoints API ────────────────────────────────────────────────────
+        if ($path -eq "/api/waypoints" -and $method -eq "GET") {
+            if (Test-Path $script:WaypointsFile) {
+                $body = [System.IO.File]::ReadAllText($script:WaypointsFile, [System.Text.Encoding]::UTF8)
+            } else {
+                $body = '{"waypoints":[]}'
+            }
+            Send-JsonResponse $rsp $body
+            return
+        }
+
+        if ($path -eq "/api/waypoints" -and $method -eq "POST") {
+            $reader = New-Object System.IO.StreamReader($req.InputStream, $req.ContentEncoding)
+            $postBody = $reader.ReadToEnd()
+            $reader.Close()
+
+            $reqData = $postBody | ConvertFrom-Json
+            $action = $reqData.action
+
+            # Load existing waypoints
+            $wpData = if (Test-Path $script:WaypointsFile) {
+                [System.IO.File]::ReadAllText($script:WaypointsFile, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
+            } else {
+                @{ waypoints = @() }
+            }
+
+            $success = $true
+            $msg = ""
+
+            switch ($action) {
+                "add" {
+                    $wp = $reqData.waypoint
+                    if (-not $wp -or -not $wp.name) {
+                        $success = $false; $msg = "Missing waypoint data"
+                    } else {
+                        $newWp = @{
+                            id       = if ($wp.id) { $wp.id } else { "wp_" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() }
+                            name     = $wp.name
+                            x        = [double]$wp.x
+                            y        = [double]$wp.y
+                            z        = [double]$wp.z
+                            category = if ($wp.category) { $wp.category } else { "custom" }
+                            preset   = [bool]$wp.preset
+                            created  = (Get-Date).ToString("yyyy-MM-dd")
+                        }
+                        $wpList = [System.Collections.ArrayList]@($wpData.waypoints)
+                        $wpList.Add($newWp) | Out-Null
+                        $wpData = @{ waypoints = $wpList.ToArray() }
+                        $msg = "Waypoint added: $($newWp.name)"
+                    }
+                }
+                "update" {
+                    $wp = $reqData.waypoint
+                    if (-not $wp -or -not $wp.id) {
+                        $success = $false; $msg = "Missing waypoint id"
+                    } else {
+                        $wpList = [System.Collections.ArrayList]@($wpData.waypoints)
+                        $found = $false
+                        for ($i = 0; $i -lt $wpList.Count; $i++) {
+                            if ($wpList[$i].id -eq $wp.id) {
+                                $existing = $wpList[$i]
+                                if ($wp.name)     { $existing.name     = $wp.name }
+                                if ($null -ne $wp.x) { $existing.x    = [double]$wp.x }
+                                if ($null -ne $wp.y) { $existing.y    = [double]$wp.y }
+                                if ($null -ne $wp.z) { $existing.z    = [double]$wp.z }
+                                if ($wp.category) { $existing.category = $wp.category }
+                                $wpList[$i] = $existing
+                                $found = $true
+                                break
+                            }
+                        }
+                        if ($found) {
+                            $wpData = @{ waypoints = $wpList.ToArray() }
+                            $msg = "Waypoint updated: $($wp.id)"
+                        } else {
+                            $success = $false; $msg = "Waypoint not found: $($wp.id)"
+                        }
+                    }
+                }
+                "delete" {
+                    $wpId = $reqData.waypoint_id
+                    if (-not $wpId) { $wpId = $reqData.waypoint.id }
+                    if (-not $wpId) {
+                        $success = $false; $msg = "Missing waypoint_id"
+                    } else {
+                        $wpList = @($wpData.waypoints | Where-Object { $_.id -ne $wpId })
+                        $wpData = @{ waypoints = $wpList }
+                        $msg = "Waypoint deleted: $wpId"
+                    }
+                }
+                default {
+                    $success = $false; $msg = "Unknown action: $action"
+                }
+            }
+
+            if ($success) {
+                $jsonOut = $wpData | ConvertTo-Json -Depth 4
+                [System.IO.File]::WriteAllText($script:WaypointsFile, $jsonOut, [System.Text.Encoding]::UTF8)
+            }
+
+            $body = @{ success = $success; message = $msg } | ConvertTo-Json
+            Send-JsonResponse $rsp $body
+            return
+        }
+
+        if ($path -eq "/api/waypoints/save-pos" -and $method -eq "POST") {
+            $reader = New-Object System.IO.StreamReader($req.InputStream, $req.ContentEncoding)
+            $postBody = $reader.ReadToEnd()
+            $reader.Close()
+
+            $reqData = $postBody | ConvertFrom-Json
+            $wpName = $reqData.name
+            $wpCategory = if ($reqData.category) { $reqData.category } else { "custom" }
+
+            if (-not $wpName) {
+                $body = @{ success = $false; message = "Missing waypoint name" } | ConvertTo-Json
+                Send-JsonResponse $rsp $body
+                return
+            }
+
+            # Get admin position from REST API
+            $restResult = $null
+            try {
+                $restResult = Invoke-RestApi -Endpoint "players"
+            } catch {}
+
+            if (-not $restResult -or -not $restResult.PSObject.Properties['players']) {
+                $body = @{ success = $false; message = "Cannot reach REST API to get player positions" } | ConvertTo-Json
+                Send-JsonResponse $rsp $body
+                return
+            }
+
+            # Find admin by UID from config
+            $adminUid = $null
+            if ($script:Config -and $script:Config.admin_uid) {
+                $adminUid = $script:Config.admin_uid
+            }
+
+            $adminPlayer = $null
+            foreach ($rp in $restResult.players) {
+                if ($adminUid -and $rp.player_id -eq $adminUid) {
+                    $adminPlayer = $rp
+                    break
+                }
+            }
+            # Fallback: use first player if admin not found by UID
+            if (-not $adminPlayer -and $restResult.players.Count -gt 0) {
+                $adminPlayer = $restResult.players[0]
+            }
+
+            if (-not $adminPlayer -or $null -eq $adminPlayer.location_x) {
+                $body = @{ success = $false; message = "Admin player not found online or no location data" } | ConvertTo-Json
+                Send-JsonResponse $rsp $body
+                return
+            }
+
+            # Create waypoint from admin's position
+            $newWp = @{
+                id       = "wp_" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+                name     = $wpName
+                x        = [double]$adminPlayer.location_x
+                y        = [double]$adminPlayer.location_y
+                z        = if ($null -ne $adminPlayer.location_z) { [double]$adminPlayer.location_z } else { 0 }
+                category = $wpCategory
+                preset   = $false
+                created  = (Get-Date).ToString("yyyy-MM-dd")
+            }
+
+            # Load and append
+            $wpData = if (Test-Path $script:WaypointsFile) {
+                [System.IO.File]::ReadAllText($script:WaypointsFile, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
+            } else {
+                @{ waypoints = @() }
+            }
+            $wpList = [System.Collections.ArrayList]@($wpData.waypoints)
+            $wpList.Add($newWp) | Out-Null
+            $wpData = @{ waypoints = $wpList.ToArray() }
+            $jsonOut = $wpData | ConvertTo-Json -Depth 4
+            [System.IO.File]::WriteAllText($script:WaypointsFile, $jsonOut, [System.Text.Encoding]::UTF8)
+
+            $body = @{
+                success  = $true
+                message  = "Saved position as '$wpName'"
+                waypoint = $newWp
+            } | ConvertTo-Json -Depth 3
             Send-JsonResponse $rsp $body
             return
         }

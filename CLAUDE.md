@@ -23,7 +23,8 @@ This is a Palworld Dedicated Server toolkit for Windows — a collection of Powe
   - `rcon-client.ps1` — Pure PowerShell RCON client
   - `live-editor-server.ps1` — HTTP server for Live Editor web dashboard
   - `live-editor/www/` — Live Editor frontend (HTML/CSS/JS)
-- `mods/LiveEditor/` — UE4SS Lua mod (file-based IPC for admin commands)
+  - `live-editor/waypoints.json` — Saved teleport waypoints (CRUD via API)
+- `mods/LiveEditor/` — UE4SS Lua mod (file-based IPC for admin commands, v2.0 — 22 command types)
 - `server/` — Palworld server files (git-ignored, installed via SteamCMD)
 - `steamcmd/` — SteamCMD installation (git-ignored)
 
@@ -69,6 +70,53 @@ Key settings include:
 - **25575** (TCP) — RCON port (if enabled)
 - **8212** (TCP) — REST API port (if enabled)
 - **8213** (TCP) — Live Editor web dashboard (localhost only)
+
+## Live Editor (Admin Dashboard)
+
+The Live Editor is a localhost web dashboard (port 8213) that sends commands to the AdminCommands UE4SS mod via file-based IPC. It supports 22 command types:
+
+### Command Reference (via LiveEditor Lua mod)
+
+| Command Type | Mod Command | Parameters |
+|---|---|---|
+| `give_item` | `!give` / `!giveme` | target_player, item_id, quantity |
+| `spawn_pal` | `!spawn` | pal_id, level |
+| `give_exp` | `!exp` / `!giveexp` | target_player, amount |
+| `fly_toggle` | `!fly` | enable (bool) |
+| `goto_coords` | `!goto` | x, y, z |
+| `bring_player` | `!bring` | target_player |
+| `bring_all` | `!bringall` | (none) |
+| `unstuck` | `!unstuck` | (none) |
+| `set_time` | `!settime` | hour (0-23) |
+| `get_time` | `!time` | (none, fire-and-forget) |
+| `announce` | `!announce` | message |
+| `slay_player` | `!slay` | target_player |
+| `freeze_player` | `!freeze` | target_player |
+| `unfreeze_player` | `!unfreeze` | target_player |
+| `spectate` | `!spectate` | (none) |
+| `kick_player` | `!kick` | target_player |
+| `ban_player` | `!ban` | target_player, reason |
+| `unban_player` | `!unban` | target_player |
+| `get_pos` | `!getpos` | target_player (fire-and-forget) |
+| `teleport_player` | `!goto` + `!bring` | target_player, x, y, z (compound) |
+| `list_players` | (UE4SS API) | (none) |
+| `echo` | (test) | message |
+
+### Waypoint System
+
+- Stored in `scripts/live-editor/waypoints.json`
+- API: `GET /api/waypoints`, `POST /api/waypoints` (CRUD), `POST /api/waypoints/save-pos`
+- Categories: boss, dungeon, town, base, resource, custom
+- Save-pos uses REST API to read admin's current in-game coordinates
+
+### Teleport Flows
+
+- Admin to waypoint: `goto_coords` with waypoint x,y,z
+- Admin to player: `goto_coords` with player's REST API coordinates
+- Bring player to admin: `bring_player`
+- Send player to waypoint: `teleport_player` (compound: goto + bring)
+- Bring all: `bring_all`
+- **Requirement:** Admin must be online in-game for teleport commands
 
 ---
 

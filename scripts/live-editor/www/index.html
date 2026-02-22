@@ -4,99 +4,253 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Palworld Live Editor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
     <!-- Status Bar -->
     <header id="status-bar">
-        <span class="server-name" id="server-name">Palworld Server</span>
-        <span id="status-indicator">
-            <span id="status-dot" class="dot stopped"></span>
-            <span id="status-text">CHECKING...</span>
-            <span id="player-count" class="dim"></span>
-            <span id="source-badge" class="source-badge" title="Player data source"></span>
-        </span>
+        <div class="status-left">
+            <span class="logo">LIVE EDITOR</span>
+            <span class="server-name" id="server-name"></span>
+        </div>
+        <div class="status-right">
+            <span class="chip" id="chip-server">
+                <span class="chip-dot" id="status-dot"></span>
+                <span id="status-text">CHECKING</span>
+            </span>
+            <span class="chip" id="chip-players">
+                <span id="player-count">-/32</span>
+            </span>
+            <span class="chip" id="chip-source" title="Player data source"></span>
+            <span class="chip" id="chip-mod"></span>
+        </div>
     </header>
 
-    <!-- Main Grid -->
-    <main class="grid">
-        <!-- Left Column -->
-        <div class="col-left">
-            <!-- Players Panel -->
-            <section class="panel" id="panel-players">
-                <h2>PLAYERS</h2>
-                <div id="player-list" class="scroll-list">
-                    <div class="empty-state">Connecting...</div>
-                </div>
-                <div id="player-detail" class="player-detail hidden"></div>
-                <div class="panel-footer dim">
-                    Auto-refresh: <span id="refresh-countdown">15</span>s
-                </div>
-            </section>
+    <!-- Tab Navigation -->
+    <nav id="tab-nav">
+        <button class="tab active" data-tab="players" onclick="switchTab('players')">Players</button>
+        <button class="tab" data-tab="items" onclick="switchTab('items')">Items</button>
+        <button class="tab" data-tab="pals" onclick="switchTab('pals')">Pals</button>
+        <button class="tab" data-tab="teleport" onclick="switchTab('teleport')">Teleport</button>
+        <button class="tab" data-tab="world" onclick="switchTab('world')">World</button>
+    </nav>
 
-            <!-- Spawn Pal Panel -->
-            <section class="panel" id="panel-spawn">
-                <h2>SPAWN PAL</h2>
-                <label>Target
-                    <select id="spawn-target" class="input-select"></select>
-                </label>
-                <label>Search
-                    <input type="text" id="spawn-search" class="input-text" placeholder="Filter pals...">
-                </label>
-                <div id="pal-list" class="scroll-list tall">
-                    <div class="empty-state">Loading pals...</div>
+    <!-- Tab Panels -->
+    <main id="content">
+
+        <!-- ── Players Tab ──────────────────────────────────────────── -->
+        <div class="tab-panel active" id="tab-players">
+            <div class="split">
+                <div class="col">
+                    <div class="panel full-h">
+                        <div class="panel-head">
+                            <h3>ONLINE</h3>
+                            <span class="badge" id="online-count">0</span>
+                            <span class="spacer"></span>
+                            <span class="dim text-xs">Refresh: <span id="refresh-countdown">15</span>s</span>
+                        </div>
+                        <div id="player-list" class="scroll-list">
+                            <div class="empty-state">Connecting...</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="inline-group">
-                    <label class="short">Level
-                        <input type="number" id="spawn-level" class="input-text" value="50" min="1" max="55">
-                    </label>
-                    <button id="btn-spawn" class="btn btn-primary" disabled>Spawn Pal</button>
+                <div class="col">
+                    <div class="panel full-h" id="player-actions-panel">
+                        <div class="panel-head"><h3>PLAYER ACTIONS</h3></div>
+                        <div id="player-actions-content" class="scroll-y">
+                            <div class="empty-state">Select a player from the list</div>
+                        </div>
+                    </div>
                 </div>
-            </section>
+            </div>
         </div>
 
-        <!-- Right Column -->
-        <div class="col-right">
-            <!-- Give Item Panel -->
-            <section class="panel" id="panel-give">
-                <h2>GIVE ITEM</h2>
-                <label>Target
-                    <select id="give-target" class="input-select"></select>
-                </label>
-                <label>Search
-                    <input type="text" id="give-search" class="input-text" placeholder="Filter items...">
-                </label>
-                <div id="item-list" class="scroll-list tall">
-                    <div class="empty-state">Loading items...</div>
+        <!-- ── Items Tab ────────────────────────────────────────────── -->
+        <div class="tab-panel" id="tab-items">
+            <div class="single">
+                <div class="panel full-h">
+                    <div class="panel-head"><h3>GIVE ITEM</h3></div>
+                    <div class="form-row">
+                        <label>Target<select id="give-target" class="input"></select></label>
+                    </div>
+                    <input type="text" id="give-search" class="input" placeholder="Search items...">
+                    <div id="item-list" class="scroll-list flex-fill">
+                        <div class="empty-state">Loading items...</div>
+                    </div>
+                    <div class="form-row inline">
+                        <label class="compact">Qty<input type="number" id="give-qty" class="input" value="1" min="1" max="9999"></label>
+                        <button id="btn-give" class="btn btn-accent" disabled>Give Item</button>
+                    </div>
                 </div>
-                <div class="inline-group">
-                    <label class="short">Qty
-                        <input type="number" id="give-qty" class="input-text" value="1" min="1" max="9999">
-                    </label>
-                    <button id="btn-give" class="btn btn-primary" disabled>Give Item</button>
-                </div>
-            </section>
-
-            <!-- Command Log Panel -->
-            <section class="panel" id="panel-log">
-                <h2>COMMAND LOG</h2>
-                <div id="command-log" class="scroll-list log-list">
-                    <div class="empty-state">No commands yet</div>
-                </div>
-            </section>
+            </div>
         </div>
+
+        <!-- ── Pals Tab ─────────────────────────────────────────────── -->
+        <div class="tab-panel" id="tab-pals">
+            <div class="single">
+                <div class="panel full-h">
+                    <div class="panel-head"><h3>SPAWN PAL</h3></div>
+                    <div class="form-row">
+                        <label>Target<select id="spawn-target" class="input"></select></label>
+                    </div>
+                    <input type="text" id="spawn-search" class="input" placeholder="Search pals...">
+                    <div id="pal-list" class="scroll-list flex-fill">
+                        <div class="empty-state">Loading pals...</div>
+                    </div>
+                    <div class="form-row inline">
+                        <label class="compact">Level<input type="number" id="spawn-level" class="input" value="50" min="1" max="55"></label>
+                        <button id="btn-spawn" class="btn btn-accent" disabled>Spawn Pal</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Teleport Tab ─────────────────────────────────────────── -->
+        <div class="tab-panel" id="tab-teleport">
+            <div class="split">
+                <div class="col">
+                    <div class="panel full-h">
+                        <div class="panel-head">
+                            <h3>WAYPOINTS</h3>
+                            <span class="badge" id="waypoint-count">0</span>
+                        </div>
+                        <input type="text" id="wp-search" class="input" placeholder="Search waypoints...">
+                        <select id="wp-cat-filter" class="input">
+                            <option value="">All Categories</option>
+                            <option value="boss">Boss</option>
+                            <option value="dungeon">Dungeon</option>
+                            <option value="town">Town</option>
+                            <option value="base">Base</option>
+                            <option value="resource">Resource</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                        <div id="waypoint-list" class="scroll-list flex-fill">
+                            <div class="empty-state">No waypoints saved</div>
+                        </div>
+                        <div class="sub-section">
+                            <h4>SAVE CURRENT POSITION</h4>
+                            <input type="text" id="wp-save-name" class="input" placeholder="Waypoint name...">
+                            <div class="form-row inline">
+                                <select id="wp-save-cat" class="input">
+                                    <option value="custom">Custom</option>
+                                    <option value="boss">Boss</option>
+                                    <option value="dungeon">Dungeon</option>
+                                    <option value="town">Town</option>
+                                    <option value="base">Base</option>
+                                    <option value="resource">Resource</option>
+                                </select>
+                                <button class="btn btn-accent" onclick="saveCurrentPosition()">Save Here</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col gap-col">
+                    <div class="panel">
+                        <div class="panel-head"><h3>GO TO COORDINATES</h3></div>
+                        <div class="coords-row">
+                            <label>X<input type="number" id="goto-x" class="input mono" value="0" step="100"></label>
+                            <label>Y<input type="number" id="goto-y" class="input mono" value="0" step="100"></label>
+                            <label>Z<input type="number" id="goto-z" class="input mono" value="0" step="100"></label>
+                        </div>
+                        <button class="btn btn-accent full-w" onclick="gotoManualCoords()">Go To Coordinates</button>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-head"><h3>SEND PLAYER TO WAYPOINT</h3></div>
+                        <label>Player<select id="tp-player" class="input"></select></label>
+                        <label>Destination<select id="tp-waypoint" class="input"></select></label>
+                        <button class="btn btn-accent full-w" onclick="teleportPlayerToWaypoint()">Teleport Player</button>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-head"><h3>QUICK TELEPORT</h3></div>
+                        <div class="btn-grid">
+                            <button class="btn" onclick="bringSelectedPlayer()">Bring Player to Me</button>
+                            <button class="btn" onclick="gotoSelectedPlayer()">Go to Player</button>
+                            <button class="btn btn-warn" onclick="bringAllPlayers()">Bring All to Me</button>
+                            <button class="btn" onclick="adminUnstuck()">Unstuck (Self)</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── World Tab ────────────────────────────────────────────── -->
+        <div class="tab-panel" id="tab-world">
+            <div class="split">
+                <div class="col gap-col">
+                    <div class="panel">
+                        <div class="panel-head"><h3>TIME CONTROL</h3></div>
+                        <div class="time-grid">
+                            <button class="btn time-btn dawn" onclick="setWorldTime(6)">Dawn<span class="dim">06:00</span></button>
+                            <button class="btn time-btn noon" onclick="setWorldTime(12)">Noon<span class="dim">12:00</span></button>
+                            <button class="btn time-btn dusk" onclick="setWorldTime(18)">Dusk<span class="dim">18:00</span></button>
+                            <button class="btn time-btn night" onclick="setWorldTime(0)">Night<span class="dim">00:00</span></button>
+                        </div>
+                        <label>Custom Hour
+                            <div class="slider-row">
+                                <input type="range" id="time-slider" class="slider" min="0" max="23" value="12" oninput="updateTimeSlider()">
+                                <span id="time-slider-val" class="mono badge">12:00</span>
+                            </div>
+                        </label>
+                        <div class="form-row inline">
+                            <button class="btn btn-accent" onclick="setTimeFromSlider()" style="flex:1">Set Time</button>
+                            <button class="btn" onclick="getWorldTime()">Get Current</button>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-head"><h3>BROADCAST</h3></div>
+                        <input type="text" id="announce-msg" class="input" placeholder="Message to all players...">
+                        <button class="btn btn-accent full-w" onclick="sendAnnounce()">Send Announcement</button>
+                    </div>
+                </div>
+                <div class="col gap-col">
+                    <div class="panel">
+                        <div class="panel-head"><h3>ADMIN POWERS</h3></div>
+                        <div class="btn-grid">
+                            <button class="btn btn-success" onclick="flyToggle(true)">Enable Fly</button>
+                            <button class="btn" onclick="flyToggle(false)">Disable Fly</button>
+                            <button class="btn" onclick="toggleSpectate()">Toggle Spectate</button>
+                            <button class="btn" onclick="adminUnstuck()">Unstuck</button>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-head"><h3>PLAYER TOOLS</h3></div>
+                        <label>Target Player<select id="world-target" class="input"></select></label>
+                        <div class="btn-grid">
+                            <button class="btn btn-warn" onclick="bringAllPlayers()">Bring All</button>
+                            <button class="btn" onclick="getPlayerPos()">Get Position</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </main>
 
-    <!-- Quick RCON Bar -->
-    <footer id="rcon-bar">
-        <button class="btn btn-sm" onclick="rconCmd('Save')">Save</button>
-        <button class="btn btn-sm" onclick="rconCmd('Info')">Info</button>
-        <button class="btn btn-sm" onclick="rconBroadcast()">Broadcast...</button>
-        <div class="rcon-custom">
-            <input type="text" id="rcon-input" class="input-text" placeholder="Custom RCON command...">
-            <button class="btn btn-sm" onclick="rconCustom()">Send</button>
+    <!-- Bottom Section: Log + RCON -->
+    <div id="bottom-section">
+        <div id="log-panel">
+            <div class="log-head" onclick="toggleLog()">
+                <span>COMMAND LOG</span>
+                <span id="log-toggle" class="log-chevron">&#9662;</span>
+            </div>
+            <div id="command-log" class="log-body">
+                <div class="empty-state">No commands yet</div>
+            </div>
         </div>
-    </footer>
+        <div id="rcon-bar">
+            <button class="btn btn-sm" onclick="rconCmd('Save')">Save</button>
+            <button class="btn btn-sm" onclick="rconCmd('Info')">Info</button>
+            <button class="btn btn-sm" onclick="rconBroadcast()">Broadcast</button>
+            <div class="rcon-input-group">
+                <input type="text" id="rcon-input" class="input" placeholder="RCON command...">
+                <button class="btn btn-sm" onclick="rconCustom()">Send</button>
+            </div>
+        </div>
+    </div>
 
     <script src="app.js"></script>
 </body>
