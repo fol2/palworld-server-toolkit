@@ -1,3 +1,14 @@
-{
-  "waypoints": []
+﻿{
+    "waypoints":  [
+                      {
+                          "id":  "wp_1771722031621",
+                          "category":  "custom",
+                          "preset":  false,
+                          "created":  "2026-02-22",
+                          "z":  0,
+                          "x":  -368884.21875,
+                          "name":  "Home",
+                          "y":  224007.21875
+                      }
+                  ]
 }
