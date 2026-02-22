@@ -44,6 +44,10 @@ $script:FullBodyMap = @{}
 $script:IconDir = $null
 $script:PartnerSkills = $null
 
+# Lua mod response cache (3s TTL)
+$script:LuaPlayersCache = $null
+$script:LuaPlayersCacheTime = [datetime]::MinValue
+
 # ── Icon mapping ────────────────────────────────────────────────────────────────
 function Build-IconMap {
     Write-Host "[LiveEditor] Building icon mapping..." -ForegroundColor Cyan
@@ -519,7 +523,8 @@ function Send-ModCommand {
     param(
         [string]$Id,
         [string]$Type,
-        [hashtable]$Params = @{}
+        [hashtable]$Params = @{},
+        [int]$TimeoutSec = 5
     )
 
     $cmd = @{
@@ -538,8 +543,8 @@ function Send-ModCommand {
     if (Test-Path $script:CmdFile) { Remove-Item $script:CmdFile -Force }
     Rename-Item $tmpFile (Split-Path $script:CmdFile -Leaf)
 
-    # Poll for response (5s timeout, check every 200ms)
-    $deadline = (Get-Date).AddSeconds(5)
+    # Poll for response (configurable timeout, check every 200ms)
+    $deadline = (Get-Date).AddSeconds($TimeoutSec)
     while ((Get-Date) -lt $deadline) {
         if (Test-Path $script:RspFile) {
             Start-Sleep -Milliseconds 50  # small settle delay
@@ -557,7 +562,7 @@ function Send-ModCommand {
 
     # Clean up stale command file on timeout
     Remove-Item $script:CmdFile -Force -ErrorAction SilentlyContinue
-    return @{ id = $Id; success = $false; message = "Timeout - mod did not respond within 5s. Is the server running with LiveEditor mod?" }
+    return @{ id = $Id; success = $false; message = "Timeout - mod did not respond within ${TimeoutSec}s. Is the server running with LiveEditor mod?" }
 }
 
 # ── MIME types ──────────────────────────────────────────────────────────────────
@@ -761,6 +766,28 @@ function Handle-Request {
             return
         }
 
+        if ($path -eq "/api/dump" -and $method -eq "POST") {
+            $reader = New-Object System.IO.StreamReader($req.InputStream, $req.ContentEncoding)
+            $postBody = $reader.ReadToEnd()
+            $reader.Close()
+
+            $cmdData = $postBody | ConvertFrom-Json
+            $cmdId = "dump_" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+
+            # Forward all params from request body
+            $params = @{}
+            foreach ($prop in $cmdData.PSObject.Properties) {
+                if ($null -ne $prop.Value) { $params[$prop.Name] = $prop.Value }
+            }
+
+            # Use extended timeout for dump commands (10s)
+            $result = Send-ModCommand -Id $cmdId -Type "dump_properties" -Params $params -TimeoutSec 10
+
+            $body = $result | ConvertTo-Json -Depth 5
+            Send-JsonResponse $rsp $body
+            return
+        }
+
         if ($path -eq "/api/command" -and $method -eq "POST") {
             $reader = New-Object System.IO.StreamReader($req.InputStream, $req.ContentEncoding)
             $postBody = $reader.ReadToEnd()
@@ -769,18 +796,172 @@ function Handle-Request {
             $cmdData = $postBody | ConvertFrom-Json
             $cmdId = "cmd_" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
 
-            # Build params, only include non-null values
+            # Build params — forward all body properties except 'type'
             $params = @{}
-            @('target_player','item_id','quantity','pal_id','level','message',
-              'amount','enable','x','y','z','hour','reason') | ForEach-Object {
-                $val = $cmdData.$_
-                if ($null -ne $val) { $params[$_] = $val }
+            foreach ($prop in $cmdData.PSObject.Properties) {
+                if ($prop.Name -ne 'type' -and $null -ne $prop.Value) {
+                    $params[$prop.Name] = $prop.Value
+                }
             }
 
             $result = Send-ModCommand -Id $cmdId -Type $cmdData.type -Params $params
 
             $body = $result | ConvertTo-Json -Depth 3
             Send-JsonResponse $rsp $body
+            return
+        }
+
+        # ── Live player data (Lua mod + REST merge) ────────────────────────
+        if ($path -eq "/api/players/live" -and $method -eq "GET") {
+            $luaPlayers = $null
+            $luaSource = $false
+
+            # Check cache (3s TTL)
+            if ($script:LuaPlayersCache -and ((Get-Date) - $script:LuaPlayersCacheTime).TotalSeconds -lt 3) {
+                $luaPlayers = $script:LuaPlayersCache
+                $luaSource = $true
+            } else {
+                # Fetch from Lua mod
+                $cmdId = "live_" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+                $luaResult = Send-ModCommand -Id $cmdId -Type "get_players_live" -TimeoutSec 5
+                if ($luaResult -and $luaResult.success) {
+                    try {
+                        $parsed = $luaResult.message | ConvertFrom-Json
+                        if ($parsed.players) {
+                            $luaPlayers = $parsed.players
+                            $script:LuaPlayersCache = $luaPlayers
+                            $script:LuaPlayersCacheTime = Get-Date
+                            $luaSource = $true
+                        }
+                    } catch {}
+                }
+            }
+
+            # Fetch REST API data for ping/location
+            $restPlayers = @()
+            try {
+                $restResult = Invoke-RestApi -Endpoint "players"
+                if ($restResult -and $restResult.PSObject.Properties['players']) {
+                    $restPlayers = $restResult.players
+                }
+            } catch {}
+
+            # Merge: Lua data + REST data
+            $merged = @()
+            $source = "rcon"
+
+            if ($luaSource -and $luaPlayers) {
+                $source = "lua_mod"
+                foreach ($lp in $luaPlayers) {
+                    $entry = @{
+                        name        = $lp.name
+                        level       = $lp.level
+                        hp          = $lp.hp
+                        max_hp      = $lp.max_hp
+                        party_count = $lp.party_count
+                    }
+                    # Merge REST data (ping, location)
+                    foreach ($rp in $restPlayers) {
+                        if ($rp.name -eq $lp.name) {
+                            $entry.ping       = $rp.ping
+                            $entry.location_x  = $rp.location_x
+                            $entry.location_y  = $rp.location_y
+                            $entry.location_z  = $rp.location_z
+                            $entry.playerId    = $rp.player_id
+                            $entry.userId      = $rp.user_id
+                            break
+                        }
+                    }
+                    $merged += $entry
+                }
+            } elseif ($restPlayers.Count -gt 0) {
+                $source = "rest_api"
+                foreach ($rp in $restPlayers) {
+                    $merged += @{
+                        name        = $rp.name
+                        level       = $rp.level
+                        ping        = $rp.ping
+                        location_x  = $rp.location_x
+                        location_y  = $rp.location_y
+                        location_z  = $rp.location_z
+                        playerId    = $rp.player_id
+                        userId      = $rp.user_id
+                    }
+                }
+            } else {
+                # Fallback to RCON
+                try {
+                    $result = Send-RconCommand -Cmd "ShowPlayers"
+                    foreach ($line in ($result -split "`n")) {
+                        $line = $line.Trim()
+                        if ($line -eq "" -or ($line -match '^name,')) { continue }
+                        $parts = $line -split ","
+                        if ($parts.Count -ge 3) {
+                            $merged += @{
+                                name      = $parts[0].Trim()
+                                playeruid = $parts[1].Trim()
+                                steamid   = $parts[2].Trim()
+                            }
+                        }
+                    }
+                } catch {}
+            }
+
+            $body = @{ players = $merged; source = $source } | ConvertTo-Json -Depth 3
+            Send-JsonResponse $rsp $body
+            return
+        }
+
+        if ($path -match '^/api/player/([^/]+)$' -and $method -eq "GET") {
+            $playerName = [System.Uri]::UnescapeDataString($Matches[1])
+            $cmdId = "detail_" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+            $luaResult = Send-ModCommand -Id $cmdId -Type "get_player_detail" -Params @{ target_player = $playerName } -TimeoutSec 8
+
+            if ($luaResult -and $luaResult.success) {
+                try {
+                    $parsed = $luaResult.message | ConvertFrom-Json
+                    $body = $parsed | ConvertTo-Json -Depth 5
+                    Send-JsonResponse $rsp $body
+                } catch {
+                    $body = @{ success = $false; message = "Parse error: $_" } | ConvertTo-Json
+                    Send-JsonResponse $rsp $body
+                }
+            } else {
+                $body = @{ success = $false; message = if ($luaResult) { $luaResult.message } else { "No response" } } | ConvertTo-Json
+                Send-JsonResponse $rsp $body
+            }
+            return
+        }
+
+        if ($path -match '^/api/player/([^/]+)/pals$' -and $method -eq "GET") {
+            $playerName = [System.Uri]::UnescapeDataString($Matches[1])
+            # Parse query params
+            $queryOffset = 0
+            $queryLimit = 30
+            $qs = $req.Url.Query
+            if ($qs -match 'offset=(\d+)') { $queryOffset = [int]$Matches[1] }
+            if ($qs -match 'limit=(\d+)') { $queryLimit = [int]$Matches[1] }
+
+            $cmdId = "pals_" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+            $luaResult = Send-ModCommand -Id $cmdId -Type "get_player_pals" -Params @{
+                target_player = $playerName
+                offset = $queryOffset
+                limit = $queryLimit
+            } -TimeoutSec 8
+
+            if ($luaResult -and $luaResult.success) {
+                try {
+                    $parsed = $luaResult.message | ConvertFrom-Json
+                    $body = $parsed | ConvertTo-Json -Depth 5
+                    Send-JsonResponse $rsp $body
+                } catch {
+                    $body = @{ success = $false; message = "Parse error: $_" } | ConvertTo-Json
+                    Send-JsonResponse $rsp $body
+                }
+            } else {
+                $body = @{ success = $false; message = if ($luaResult) { $luaResult.message } else { "No response" } } | ConvertTo-Json
+                Send-JsonResponse $rsp $body
+            }
             return
         }
 

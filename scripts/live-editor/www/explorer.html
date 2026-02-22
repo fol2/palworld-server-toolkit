@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UObject Explorer — LiveEditor Dev Tool</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep:    #08080C;
+            --bg:         #0D0D12;
+            --bg-panel:   #131318;
+            --bg-surface: #1A1A22;
+            --bg-hover:   #22222E;
+            --bg-active:  #2A2A3A;
+            --border:     #1E1E2A;
+            --border-light: #2A2A3A;
+            --text:       #E0E0EC;
+            --text-sec:   #7878A0;
+            --text-muted: #404060;
+            --blue:       #4B8BF5;
+            --green:      #34D399;
+            --red:        #F87171;
+            --amber:      #FBBF24;
+            --cyan:       #22D3EE;
+            --purple:     #A78BFA;
+            --accent:     var(--blue);
+            --accent-dim: rgba(75, 139, 245, 0.15);
+        }
+
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Outfit', system-ui, sans-serif;
+            font-size: 13px;
+            background: var(--bg-deep);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.015) 39px, rgba(255,255,255,0.015) 40px),
+                repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.015) 39px, rgba(255,255,255,0.015) 40px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            z-index: 10;
+            flex-shrink: 0;
+        }
+
+        .logo { font-weight: 700; font-size: 13px; letter-spacing: 2px; color: var(--accent); }
+        .logo-sub { font-weight: 400; font-size: 12px; color: var(--text-sec); margin-left: 10px; }
+        .back-link { color: var(--text-sec); text-decoration: none; font-size: 12px; }
+        .back-link:hover { color: var(--text); }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            padding: 12px 20px;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            z-index: 10;
+        }
+
+        .ctrl-group {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .ctrl-group label {
+            font-size: 9px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .input {
+            background: var(--bg);
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            color: var(--text);
+            padding: 6px 10px;
+            font-size: 12px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--accent-dim);
+        }
+        .input.mono { font-family: 'Fira Code', monospace; font-size: 11px; }
+
+        select.input { cursor: pointer; }
+
+        .btn {
+            background: var(--bg-surface);
+            color: var(--text);
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            padding: 6px 16px;
+            font-size: 12px;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.15s;
+            white-space: nowrap;
+        }
+        .btn:hover { background: var(--bg-hover); }
+        .btn-accent { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+        .btn-accent:hover { background: #3A7AE4; }
+        .btn-accent:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-sm { padding: 4px 10px; font-size: 11px; }
+
+        .preset-btns { display: flex; gap: 4px; }
+        .preset-btns .btn { padding: 4px 8px; font-size: 10px; }
+
+        /* Breadcrumb */
+        .breadcrumb {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            padding: 8px 20px;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            font-family: 'Fira Code', monospace;
+            font-size: 11px;
+            overflow-x: auto;
+        }
+        .bc-segment {
+            color: var(--cyan);
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 3px;
+            transition: background 0.1s;
+        }
+        .bc-segment:hover { background: var(--bg-hover); }
+        .bc-sep { color: var(--text-muted); }
+        .bc-current { color: var(--text); cursor: default; }
+        .bc-current:hover { background: none; }
+
+        /* Results */
+        .results {
+            flex: 1;
+            min-height: 0;
+            overflow: auto;
+            z-index: 1;
+        }
+
+        .results-info {
+            padding: 8px 20px;
+            font-size: 11px;
+            color: var(--text-sec);
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-panel);
+            display: flex;
+            gap: 16px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            background: var(--bg-panel);
+            padding: 6px 12px;
+            text-align: left;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: var(--text-sec);
+            border-bottom: 1px solid var(--border);
+            z-index: 5;
+        }
+
+        td {
+            padding: 4px 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+            vertical-align: top;
+        }
+
+        tr:hover { background: var(--bg-hover); }
+
+        .col-offset {
+            font-family: 'Fira Code', monospace;
+            font-size: 10px;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .col-type {
+            font-family: 'Fira Code', monospace;
+            font-size: 11px;
+            color: var(--purple);
+            white-space: nowrap;
+        }
+
+        .col-name {
+            font-family: 'Fira Code', monospace;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .col-value {
+            font-family: 'Fira Code', monospace;
+            font-size: 11px;
+            color: var(--text-sec);
+            max-width: 600px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .col-value.drillable {
+            color: var(--cyan);
+            cursor: pointer;
+        }
+        .col-value.drillable:hover {
+            text-decoration: underline;
+        }
+        .col-value.error { color: var(--red); }
+        .col-value.numeric { color: var(--green); }
+        .col-value.bool-true { color: var(--green); }
+        .col-value.bool-false { color: var(--red); }
+        .col-value.string-val { color: var(--amber); }
+
+        .empty-state {
+            padding: 40px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .status-bar {
+            padding: 6px 20px;
+            font-size: 11px;
+            color: var(--text-sec);
+            background: var(--bg-panel);
+            border-top: 1px solid var(--border);
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        .status-ok { color: var(--green); }
+        .status-err { color: var(--red); }
+        .status-loading { color: var(--amber); }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .slider {
+            width: 100px;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 4px;
+            background: var(--bg-surface);
+            border-radius: 2px;
+            outline: none;
+        }
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px; height: 12px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+        }
+        .slider-val {
+            font-family: 'Fira Code', monospace;
+            font-size: 11px;
+            color: var(--text-sec);
+            min-width: 24px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <span class="logo">UOBJECT EXPLORER</span>
+            <span class="logo-sub">LiveEditor Dev Tool</span>
+        </div>
+        <a href="/" class="back-link">&larr; Back to Live Editor</a>
+    </header>
+
+    <div class="controls">
+        <div class="ctrl-group">
+            <label>Class Name</label>
+            <input type="text" id="class-name" class="input mono" value="PalPlayerState" style="width:220px">
+        </div>
+        <div class="ctrl-group">
+            <label>Presets</label>
+            <div class="preset-btns">
+                <button class="btn btn-sm" onclick="setPreset('PalPlayerState')">PlayerState</button>
+                <button class="btn btn-sm" onclick="setPreset('PalPlayerCharacter')">PlayerChar</button>
+                <button class="btn btn-sm" onclick="setPreset('PalGameStateInGame')">GameState</button>
+                <button class="btn btn-sm" onclick="setPreset('PalWorldSettings')">WorldSettings</button>
+            </div>
+        </div>
+        <div class="ctrl-group">
+            <label>Instance #</label>
+            <input type="number" id="inst-idx" class="input mono" value="0" min="0" style="width:60px">
+        </div>
+        <div class="ctrl-group">
+            <label>Property Path</label>
+            <input type="text" id="prop-path" class="input mono" placeholder="e.g. PawnPrivate.SomeComponent" style="width:280px">
+        </div>
+        <div class="ctrl-group">
+            <label>Max Items</label>
+            <div class="slider-row">
+                <input type="range" id="max-items" class="slider" min="10" max="200" value="50" oninput="document.getElementById('max-val').textContent=this.value">
+                <span id="max-val" class="slider-val">50</span>
+            </div>
+        </div>
+        <div class="ctrl-group">
+            <label>&nbsp;</label>
+            <button id="btn-dump" class="btn btn-accent" onclick="doDump()">Dump Properties</button>
+        </div>
+    </div>
+
+    <div class="breadcrumb" id="breadcrumb">
+        <span class="bc-current">Ready</span>
+    </div>
+
+    <div class="results-info" id="results-info" style="display:none">
+        <span id="info-class"></span>
+        <span id="info-instances"></span>
+        <span id="info-props"></span>
+    </div>
+
+    <div class="results" id="results">
+        <div class="empty-state">
+            Enter a class name and click "Dump Properties" to explore UObject properties.<br>
+            <span style="color:var(--text-sec);font-size:11px;margin-top:8px;display:inline-block">
+                Tip: Click on ObjectProperty or StructProperty values to drill into them.
+            </span>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <span id="status-text">Ready</span>
+        <span id="status-time"></span>
+    </div>
+
+    <script src="explorer.js"></script>
+</body>
+</html>

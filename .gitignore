@@ -22,6 +22,8 @@ scripts/git-config
 
 # Screenshots (may contain personal data)
 *.png
+# But allow game icon assets
+!scripts/live-editor/www/icons/**/*.png
 
 # OS / IDE
 .vscode/

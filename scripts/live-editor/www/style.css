@@ -572,7 +572,7 @@ body.resizing {
     align-items: center;
     flex-shrink: 0;
 }
-.elem-icon svg { width: 10px; height: 10px; }
+.elem-icon svg, .elem-icon img { width: 10px; height: 10px; }
 
 .pal-item-stats {
     font-size: 10px;
@@ -1198,7 +1198,7 @@ select.input {
     justify-content: center;
     color: var(--wc);
 }
-.work-chip-icon svg {
+.work-chip-icon svg, .work-chip-icon img {
     width: 22px;
     height: 22px;
 }
@@ -1222,7 +1222,7 @@ select.input {
     display: inline-flex;
     align-items: center;
 }
-.mini-work-icon svg { width: 11px; height: 11px; }
+.mini-work-icon svg, .mini-work-icon img { width: 11px; height: 11px; }
 .mini-work-lvl {
     font-size: 9px;
     font-family: 'Fira Code', monospace;
@@ -1252,7 +1252,9 @@ select.input {
     justify-content: center;
     flex-shrink: 0;
 }
-.elem-pill-icon svg, .work-pill-icon svg, .ps-pill-icon svg { width: 14px; height: 14px; }
+.elem-pill-icon svg, .elem-pill-icon img,
+.work-pill-icon svg, .work-pill-icon img,
+.ps-pill-icon svg, .ps-pill-icon img { width: 14px; height: 14px; }
 
 /* ── Detail Section Labels ─────────────────────────────────────────────────── */
 
@@ -1279,7 +1281,7 @@ select.input {
     padding: 2px 8px;
 }
 .detail-elements .elem-icon { width: 13px; height: 13px; }
-.detail-elements .elem-icon svg { width: 13px; height: 13px; }
+.detail-elements .elem-icon svg, .detail-elements .elem-icon img { width: 13px; height: 13px; }
 
 /* ── Pal List Item with Icon ───────────────────────────────────────────────── */
 
@@ -1710,7 +1712,7 @@ select.input {
     border: 1px solid color-mix(in srgb, var(--ps-color) 18%, transparent);
     border-radius: 10px;
 }
-.ps-icon-wrap svg {
+.ps-icon-wrap svg, .ps-icon-wrap img {
     width: 30px;
     height: 30px;
 }
@@ -1775,4 +1777,214 @@ select.input {
 ::selection {
     background: var(--accent-dim);
     color: var(--text);
+}
+
+/* ── Phase B: Live Player Data Enhancements ──────────────────────────────── */
+
+/* MOD source badge */
+.chip.mod-src { border-color: rgba(75, 139, 245, 0.3); color: var(--blue); }
+
+/* Player HP bar (inline in player list) */
+.player-hp-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 3px;
+}
+
+.player-hp-bg {
+    flex: 1;
+    height: 3px;
+    background: var(--bg-surface);
+    border-radius: 2px;
+    overflow: hidden;
+    max-width: 100px;
+}
+
+.player-hp-fill {
+    height: 100%;
+    background: var(--green);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.player-hp-text {
+    font-family: 'Fira Code', monospace;
+    font-size: 9px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.player-party-count {
+    font-size: 9px;
+    color: var(--text-muted);
+    font-family: 'Fira Code', monospace;
+}
+
+/* Player detail — HP bar (larger) */
+.pa-hp-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.pa-hp-bg {
+    flex: 1;
+    height: 6px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.pa-hp-fill {
+    height: 100%;
+    background: var(--green);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.pa-hp-text {
+    font-family: 'Fira Code', monospace;
+    font-size: 11px;
+    color: var(--text);
+    white-space: nowrap;
+}
+
+/* Player detail — Stats row */
+.pa-stats-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 6px;
+}
+
+.pa-stat {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+}
+
+.pa-stat-label {
+    color: var(--text-sec);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.pa-stat-value {
+    font-family: 'Fira Code', monospace;
+    font-weight: 500;
+}
+
+/* Player detail — Inventory section */
+.pa-inventory {
+    margin-top: 8px;
+}
+
+.pa-inv-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+}
+
+.pa-inv-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    font-size: 11px;
+    border-bottom: 1px solid var(--border);
+}
+
+.pa-inv-item:last-child { border-bottom: none; }
+
+.pa-inv-item .icon-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
+}
+
+.pa-inv-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pa-inv-qty {
+    font-family: 'Fira Code', monospace;
+    font-size: 10px;
+    color: var(--amber);
+    font-weight: 600;
+}
+
+/* Player detail — Party pals section */
+.pa-party {
+    margin-top: 8px;
+}
+
+.pa-party-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.pa-pal-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+}
+
+.pa-pal-card .icon-thumb {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+}
+
+.pa-pal-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.pa-pal-name {
+    font-weight: 500;
+    font-size: 12px;
+}
+
+.pa-pal-meta {
+    font-size: 10px;
+    color: var(--text-sec);
+    font-family: 'Fira Code', monospace;
+}
+
+.pa-pal-level {
+    color: var(--amber);
+    font-weight: 600;
+    font-size: 10px;
+    font-family: 'Fira Code', monospace;
+}
+
+.pa-pal-hp-bg {
+    width: 60px;
+    height: 3px;
+    background: var(--bg-surface);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.pa-pal-hp-fill {
+    height: 100%;
+    background: var(--green);
+    border-radius: 2px;
 }

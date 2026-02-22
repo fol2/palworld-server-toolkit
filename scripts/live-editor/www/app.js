@@ -44,16 +44,17 @@ const ELEM_COLORS = {
 };
 
 /* Element SVG icons (16x16 viewBox, uses currentColor) */
+/* Element icons — original game PNGs from palworld.wiki.gg */
 const ELEM_ICONS = {
-    Fire: '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M8 1c0 3.5-4 5.5-4 8.5a4 4 0 008 0C12 6.5 8 4.5 8 1z"/></svg>',
-    Water: '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M8 1.5L4.5 8a3.5 3.5 0 007 0L8 1.5z"/></svg>',
-    Ice: '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M7.25 1h1.5v3.4l2.4-2.4 1.1 1.1L9.4 6h3.1v1.5H9.4l2.85 2.9-1.1 1.1-2.4-2.4V14h-1.5V9.1L4.85 11.5l-1.1-1.1L6.6 7.5H3.5V6h3.1L3.75 3.1l1.1-1.1 2.4 2.4V1z"/></svg>',
-    Electricity: '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M9.5 1L4 8.5h4L6.5 15 12 7.5H8L9.5 1z"/></svg>',
-    Earth: '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M8 1a7 7 0 100 14A7 7 0 008 1zM5 5.5a1.5 1.5 0 113 0 1.5 1.5 0 01-3 0zM4 10a1 1 0 112 0 1 1 0 01-2 0zm5-1a2 2 0 114 0 2 2 0 01-4 0z"/></svg>',
-    Dark: '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M6 1a7 7 0 109 6.5A5.5 5.5 0 016 1z"/></svg>',
-    Dragon: '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M8 1L6 5l-4 1 3 3-.5 4L8 11l3.5 2L11 9l3-3-4-1L8 1z"/></svg>',
-    Leaf: '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M3 13C3 7 7 2 13 2c0 6-4 11-10 11zm1.5-1.5C7 10 9 7.5 10 4.5"/><path fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" d="M4.5 11.5C7 10 9 7.5 10 4.5"/></svg>',
-    Normal: '<svg viewBox="0 0 16 16"><circle fill="currentColor" cx="8" cy="8" r="5.5"/><circle fill="var(--bg, #1a1a2e)" cx="8" cy="8" r="3"/></svg>',
+    Fire: '<img src="icons/elem/fire.png" alt="Fire">',
+    Water: '<img src="icons/elem/water.png" alt="Water">',
+    Ice: '<img src="icons/elem/ice.png" alt="Ice">',
+    Electricity: '<img src="icons/elem/electric.png" alt="Electricity">',
+    Earth: '<img src="icons/elem/ground.png" alt="Earth">',
+    Dark: '<img src="icons/elem/dark.png" alt="Dark">',
+    Dragon: '<img src="icons/elem/dragon.png" alt="Dragon">',
+    Leaf: '<img src="icons/elem/grass.png" alt="Leaf">',
+    Normal: '<img src="icons/elem/neutral.png" alt="Normal">',
 };
 
 /* Item group display labels */
@@ -85,51 +86,38 @@ const WORK_SHORT = {
     'Crude Oil Extraction': 'Oil'
 };
 
-/* Work suitability SVG icons (16x16 viewBox, uses currentColor) */
+/* Work suitability icons — original game PNGs from palworld.wiki.gg (Oil Extraction: custom SVG) */
 const WORK_ICONS = {
-    'Kindling': '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M8 1c0 3.5-4 5.5-4 8.5a4 4 0 008 0C12 6.5 8 4.5 8 1z"/></svg>',
-    'Watering': '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M8 1.5L4.5 8a3.5 3.5 0 007 0L8 1.5z"/></svg>',
-    'Planting': '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M7 14v-4C4.5 10 2 8 2 5c3 0 5 2 5 5V6c0-3 2-5 5-5 0 3-2.5 5-5 5v4c0 2-1 4-1 4H7z"/></svg>',
-    'Generating Electricity': '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M9.5 1L4 8.5h4L6.5 15 12 7.5H8L9.5 1z"/></svg>',
-    'Handiwork': '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M14 4.5a3.5 3.5 0 00-5-3.2l-1 3.2L4.2 8.2l-2.5-1L.5 9l6 6 1.8-1.2-1-2.5 3.7-3.8 3.2-1A3.5 3.5 0 0014 4.5zM2 14.5a1 1 0 110-2 1 1 0 010 2z"/></svg>',
-    'Gathering': '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M4 6.5L2.5 13c-.2.8.4 1.5 1.2 1.5h8.6c.8 0 1.4-.7 1.2-1.5L12 6.5H4zm4-5L5.5 5h5L8 1.5z"/></svg>',
-    'Lumbering': '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M9.5 2L3 8.5l1.5 1.5 2-2v6h2v-6l2 2L12 8.5 9.5 2zM4 12l-2.5 3h3L4 12z"/></svg>',
-    'Mining': '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M12.8 1.2a1 1 0 00-1.4 0L7 5.6 5.4 4 4 5.4 5.6 7l-4.4 4.4a1 1 0 000 1.4l2 2a1 1 0 001.4 0L9 10.4l1.6 1.6 1.4-1.4L10.4 9l4.4-4.4a1 1 0 000-1.4l-2-2z"/></svg>',
-    'Medicine Production': '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M6 1.5h4v4h4v4h-4v4H6v-4H2v-4h4v-4z"/></svg>',
-    'Cooling': '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M7.25 1h1.5v3.4l2.4-2.4 1.1 1.1L9.4 6h3.1v1.5H9.4l2.85 2.9-1.1 1.1-2.4-2.4V14h-1.5v-4.9L4.85 11.5l-1.1-1.1L6.6 7.5H3.5V6h3.1L3.75 3.1l1.1-1.1 2.4 2.4V1z"/></svg>',
-    'Transporting': '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M1 3.5h8v7H1v-7zm8 1h2.5l2.5 3v3h-5v-6zM4 13a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm7 0a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/></svg>',
-    'Farming': '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M8.5 14V9.5C10 9 12 7 12 4.5c-2 0-3.5 1.5-3.5 3.5V4C8.5 2 7 .5 5 .5 5 2.5 6.5 4 8.5 4v10h-1V14h2zM3 12h10v1.5H3V12z"/></svg>',
+    'Kindling': '<img src="icons/work/kindling.png" alt="Kindling">',
+    'Watering': '<img src="icons/work/watering.png" alt="Watering">',
+    'Planting': '<img src="icons/work/planting.png" alt="Planting">',
+    'Generating Electricity': '<img src="icons/work/generating_electricity.png" alt="Generating Electricity">',
+    'Handiwork': '<img src="icons/work/handiwork.png" alt="Handiwork">',
+    'Gathering': '<img src="icons/work/gathering.png" alt="Gathering">',
+    'Lumbering': '<img src="icons/work/lumbering.png" alt="Lumbering">',
+    'Mining': '<img src="icons/work/mining.png" alt="Mining">',
+    'Medicine Production': '<img src="icons/work/medicine_production.png" alt="Medicine Production">',
+    'Cooling': '<img src="icons/work/cooling.png" alt="Cooling">',
+    'Transporting': '<img src="icons/work/transporting.png" alt="Transporting">',
+    'Farming': '<img src="icons/work/farming.png" alt="Farming">',
     'Crude Oil Extraction': '<svg viewBox="0 0 16 16"><path fill="currentColor" d="M8 1L5 7.5a3 3 0 006 0L8 1zM4 12h8a1 1 0 011 1v1a1 1 0 01-1 1H4a1 1 0 01-1-1v-1a1 1 0 011-1z"/></svg>',
 };
 
-/* Partner skill type SVG icons (32x32 viewBox) — categorised by description keywords */
+/* Partner skill type icons — original game assets from Palworld Fandom wiki */
 const PS_ICONS = {
-    // Flying mount — spread wings
-    fly: '<svg viewBox="0 0 32 32"><path fill="currentColor" d="M16 10l-6-6c-3-2-7-1-8 2 0 2 1 4 3 5l7 4h8l7-4c2-1 3-3 3-5-1-3-5-4-8-2l-6 6z"/><path fill="currentColor" d="M14 16h4v4l-2 6-2-6v-4z" opacity="0.5"/></svg>',
-    // Ground mount — saddle
-    ride: '<svg viewBox="0 0 32 32"><path fill="currentColor" d="M8 20c0-5 3.5-9 8-9s8 4 8 9" stroke="currentColor" stroke-width="1" fill="none"/><ellipse fill="currentColor" cx="16" cy="13" rx="5" ry="3"/><path fill="currentColor" d="M11 13c-2 0-4 1-4 3v2h2v-2c0-.5.5-1 1.5-1h1v-2zm10 0c2 0 4 1 4 3v2h-2v-2c0-.5-.5-1-1.5-1h-1v-2z" opacity="0.6"/><path fill="currentColor" d="M8 20h16v2a2 2 0 01-2 2H10a2 2 0 01-2-2v-2z" opacity="0.4"/></svg>',
-    // Water mount — waves
-    swim: '<svg viewBox="0 0 32 32"><path fill="currentColor" d="M4 18c2-2 4-2 6 0s4 2 6 0 4-2 6 0 4 2 6 0" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"/><path fill="currentColor" d="M6 23c2-2 4-2 6 0s4 2 6 0 4-2 6 0" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.4"/><path fill="currentColor" d="M16 6l-3 5h2v4h2v-4h2l-3-5z"/></svg>',
-    // Combat follower — crossed swords
-    combat: '<svg viewBox="0 0 32 32"><path fill="currentColor" d="M8 4l2 12 3-3 4 5 2-2-4-5 3-3L8 4zm16 0L12 8l3 3-4 5 2 2 4-5 3 3 2-12z" opacity="0.9"/><path fill="currentColor" d="M9 24l3-3 2 2-3 3a1.5 1.5 0 01-2-2zm14 0l-3-3-2 2 3 3a1.5 1.5 0 002-2z" opacity="0.6"/></svg>',
-    // Shield — shield shape
-    shield: '<svg viewBox="0 0 32 32"><path fill="currentColor" d="M16 3L5 8v8c0 7 5 11 11 14 6-3 11-7 11-14V8L16 3z" opacity="0.3"/><path fill="currentColor" d="M16 5L7 9v7c0 6 4 9.5 9 12 5-2.5 9-6 9-12V9L16 5z" fill="none" stroke="currentColor" stroke-width="1.5"/><path fill="currentColor" d="M14 13h4v2h2v4h-2v2h-4v-2h-2v-4h2v-2z" opacity="0.7"/></svg>',
-    // Healer — heart with plus
-    heal: '<svg viewBox="0 0 32 32"><path fill="currentColor" d="M16 28l-1.5-1.4C7 20 3 16 3 11.5 3 7.4 6 4 10 4c2.3 0 4.5 1.1 6 2.8C17.5 5.1 19.7 4 22 4c4 0 7 3.4 7 7.5 0 4.5-4 8.5-11.5 15.1L16 28z" opacity="0.8"/><path fill="currentColor" d="M14.5 12h3v3h3v3h-3v3h-3v-3h-3v-3h3v-3z" fill="white" opacity="0.9"/></svg>',
-    // Ranch producer — egg/barn
-    ranch: '<svg viewBox="0 0 32 32"><ellipse fill="currentColor" cx="16" cy="18" rx="7" ry="9" opacity="0.7"/><ellipse fill="currentColor" cx="16" cy="15" rx="4" ry="5" opacity="0.15"/><path fill="currentColor" d="M6 27h20v2H6z" opacity="0.3"/></svg>',
-    // Carry supplies — backpack
-    carry: '<svg viewBox="0 0 32 32"><rect fill="currentColor" x="9" y="10" width="14" height="16" rx="3" opacity="0.7"/><path fill="currentColor" d="M12 10V8a4 4 0 018 0v2" stroke="currentColor" stroke-width="2" fill="none"/><rect fill="currentColor" x="12" y="16" width="8" height="5" rx="1" opacity="0.25"/></svg>',
-    // Movement speed — running wind
-    speed: '<svg viewBox="0 0 32 32"><path fill="currentColor" d="M18 6a5 5 0 015 5h-3a2 2 0 10-2-2V6zm2 10a4 4 0 014 4h-3a1 1 0 10-1-1v-3z" opacity="0.5"/><path fill="currentColor" d="M4 13h14M4 19h10M4 25h7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/></svg>',
-    // Sanity — moon calm
-    sanity: '<svg viewBox="0 0 32 32"><path fill="currentColor" d="M14 4a12 12 0 100 24c-5 0-8-5-8-12S9 4 14 4z"/><circle fill="currentColor" cx="22" cy="8" r="1" opacity="0.5"/><circle fill="currentColor" cx="25" cy="12" r="0.7" opacity="0.4"/><circle fill="currentColor" cx="20" cy="5" r="0.7" opacity="0.3"/></svg>',
-    // Passive buff — star arrow up
-    buff: '<svg viewBox="0 0 32 32"><path fill="currentColor" d="M16 3l3.5 7 7.5 1.1-5.4 5.3L23 24l-7-3.7L9 24l1.4-7.6L5 11.1l7.5-1.1L16 3z" opacity="0.8"/></svg>',
-    // Gun/ranged — crosshair
-    gun: '<svg viewBox="0 0 32 32"><circle fill="none" stroke="currentColor" stroke-width="2" cx="16" cy="16" r="8"/><circle fill="currentColor" cx="16" cy="16" r="2"/><path stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M16 4v6m0 12v6M4 16h6m12 0h6"/></svg>',
-    // Thief/stealer — grabbing hand
-    thief: '<svg viewBox="0 0 32 32"><path fill="currentColor" d="M12 14v-4a1.5 1.5 0 013 0v4m0-5v-3a1.5 1.5 0 013 0v3m0 4v-6a1.5 1.5 0 013 0v6m0 0a1.5 1.5 0 013 0v3c0 5-3 9-8 9h-1c-4 0-7-3-7-7v-3a1.5 1.5 0 013 0v2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    fly:    '<img src="icons/ps/fly.webp" alt="Flying">',
+    ride:   '<img src="icons/ps/ride.webp" alt="Riding">',
+    swim:   '<img src="icons/ps/swim.webp" alt="Swimming">',
+    combat: '<img src="icons/ps/combat.webp" alt="Combat">',
+    shield: '<img src="icons/ps/shield.webp" alt="Shield">',
+    heal:   '<img src="icons/ps/heal.webp" alt="Heal">',
+    ranch:  '<img src="icons/ps/ranch.webp" alt="Ranch">',
+    carry:  '<img src="icons/ps/carry.webp" alt="Carry">',
+    speed:  '<img src="icons/ps/speed.webp" alt="Speed">',
+    sanity: '<img src="icons/ps/sanity.webp" alt="Sanity">',
+    buff:   '<img src="icons/ps/buff.webp" alt="Buff">',
+    gun:    '<img src="icons/ps/gun.webp" alt="Ranged">',
+    thief:  '<img src="icons/ps/thief.webp" alt="Thief">',
 };
 
 function getPartnerSkillType(desc) {
@@ -256,7 +244,11 @@ async function refreshStatus() {
 /* ── Players ───────────────────────────────────────────────────────────────── */
 
 async function refreshPlayers() {
-    const data = await apiGet('/api/players');
+    // Try /api/players/live first (merged Lua+REST), fallback to /api/players
+    let data = await apiGet('/api/players/live');
+    if (!data || !data.players) {
+        data = await apiGet('/api/players');
+    }
     if (!data) return;
 
     state.players = data.players || [];
@@ -281,12 +273,13 @@ function renderPlayers() {
         return;
     }
 
-    const isRest = state.playerSource === 'rest_api';
+    const hasRichData = state.playerSource === 'rest_api' || state.playerSource === 'lua_mod';
+    const isLua = state.playerSource === 'lua_mod';
 
     el.innerHTML = state.players.map(p => {
         const sel = p.name === state.selectedPlayer ? ' selected' : '';
         let metaHtml = '';
-        if (isRest) {
+        if (hasRichData) {
             const parts = [];
             if (p.userId) parts.push(esc(p.userId));
             if (p.ping != null) {
@@ -297,12 +290,25 @@ function renderPlayers() {
             if (p.location_x != null && p.location_y != null) {
                 parts.push('<span class="mono">(' + Math.round(p.location_x) + ', ' + Math.round(p.location_y) + ')</span>');
             }
+            if (isLua && p.party_count != null) {
+                parts.push('<span class="player-party-count">Party: ' + p.party_count + '</span>');
+            }
             if (parts.length > 0) {
                 metaHtml = '<div class="player-meta">' + parts.join('<span class="sep"> | </span>') + '</div>';
             }
         }
 
-        const levelHtml = isRest && p.level ? '<span class="player-level">Lv' + p.level + '</span>' : '';
+        const levelHtml = (hasRichData && p.level) ? '<span class="player-level">Lv' + p.level + '</span>' : '';
+
+        // HP bar (when Lua data available)
+        let hpHtml = '';
+        if (isLua && p.hp != null && p.max_hp != null && p.max_hp > 0) {
+            const pct = Math.min((p.hp / p.max_hp) * 100, 100).toFixed(0);
+            hpHtml = '<div class="player-hp-bar">' +
+                '<div class="player-hp-bg"><div class="player-hp-fill" style="width:' + pct + '%"></div></div>' +
+                '<span class="player-hp-text">' + p.hp + '/' + p.max_hp + '</span>' +
+            '</div>';
+        }
 
         return '<div class="player-item' + sel + '" onclick="selectPlayer(\'' + esc(p.name) + '\')">' +
             '<span class="player-dot"></span>' +
@@ -311,6 +317,7 @@ function renderPlayers() {
                     '<span class="player-name">' + esc(p.name) + '</span>' +
                     levelHtml +
                 '</div>' +
+                hpHtml +
                 metaHtml +
             '</div>' +
         '</div>';
@@ -326,22 +333,41 @@ function renderPlayerActions() {
         return;
     }
 
-    const isRest = state.playerSource === 'rest_api';
+    const hasRichData = state.playerSource === 'rest_api' || state.playerSource === 'lua_mod';
+    const isLua = state.playerSource === 'lua_mod';
     const pingText = (p.ping != null) ? Math.round(p.ping) + 'ms' : 'N/A';
     const locText = (p.location_x != null && p.location_y != null)
         ? '(' + Math.round(p.location_x) + ', ' + Math.round(p.location_y) + ')' : 'N/A';
     const levelText = p.level != null ? 'Lv' + p.level : '';
-    const playerId = p.playerId || p.playeruid || '';
 
     let statsHtml = '';
-    if (isRest) {
+    if (hasRichData) {
         statsHtml = '<div class="pa-stats">' + levelText + '  |  Ping: ' + pingText + '  |  Pos: ' + locText + '</div>';
     }
+
+    // HP bar for Lua data (from live list) — will be enhanced with detail data
+    let hpBarHtml = '';
+    if (isLua && p.hp != null && p.max_hp != null && p.max_hp > 0) {
+        const pct = Math.min((p.hp / p.max_hp) * 100, 100).toFixed(0);
+        hpBarHtml = '<div class="pa-hp-bar">' +
+            '<span class="pa-stat-label">HP</span>' +
+            '<div class="pa-hp-bg"><div class="pa-hp-fill" style="width:' + pct + '%"></div></div>' +
+            '<span class="pa-hp-text">' + p.hp + ' / ' + p.max_hp + '</span>' +
+        '</div>';
+    }
+
+    // Inventory + party pals containers — populated via async detail fetch
+    let detailSectionsHtml =
+        '<div id="pa-detail-sections">' +
+            '<div id="pa-inventory-section"></div>' +
+            '<div id="pa-party-section"></div>' +
+        '</div>';
 
     el.innerHTML =
         '<div class="pa-header">' +
             '<div class="pa-name">' + esc(p.name) + '</div>' +
             statsHtml +
+            hpBarHtml +
         '</div>' +
 
         '<div class="action-group">' +
@@ -384,12 +410,114 @@ function renderPlayerActions() {
                 '<button class="btn btn-sm" onclick="gotoSelectedPlayer()">Go to Player</button>' +
                 '<button class="btn btn-sm" onclick="getSelectedPlayerPos()">Get Position</button>' +
             '</div>' +
-        '</div>';
+        '</div>' +
+
+        detailSectionsHtml;
+
+    // Async: fetch player detail for inventory + party pals
+    if (isLua && p.name) {
+        fetchPlayerDetail(p.name);
+    }
+}
+
+/* Fetch detailed player data (inventory, party pals) from Lua mod */
+async function fetchPlayerDetail(playerName) {
+    const data = await apiGet('/api/player/' + encodeURIComponent(playerName));
+    if (!data || data.success === false) return;
+    // Guard: player may have changed during the await
+    if (state.selectedPlayer !== playerName) return;
+
+    // Render HP bar with detail data (if we got better data)
+    if (data.hp != null && data.max_hp != null) {
+        const pct = data.max_hp > 0 ? Math.min((data.hp / data.max_hp) * 100, 100).toFixed(0) : 0;
+        const hpEl = document.querySelector('.pa-hp-bar');
+        if (hpEl) {
+            hpEl.innerHTML =
+                '<span class="pa-stat-label">HP</span>' +
+                '<div class="pa-hp-bg"><div class="pa-hp-fill" style="width:' + pct + '%"></div></div>' +
+                '<span class="pa-hp-text">' + data.hp + ' / ' + data.max_hp + '</span>';
+        }
+    }
+
+    // Stats row
+    if (data.attack != null || data.defense != null) {
+        const hpBar = document.querySelector('.pa-hp-bar');
+        if (hpBar) {
+            let statsRow = '<div class="pa-stats-row">';
+            if (data.attack != null) {
+                statsRow += '<div class="pa-stat"><span class="pa-stat-label">ATK</span> <span class="pa-stat-value">' + data.attack + '</span></div>';
+            }
+            if (data.defense != null) {
+                statsRow += '<div class="pa-stat"><span class="pa-stat-label">DEF</span> <span class="pa-stat-value">' + data.defense + '</span></div>';
+            }
+            statsRow += '</div>';
+            hpBar.insertAdjacentHTML('afterend', statsRow);
+        }
+    }
+
+    // Inventory section
+    const invEl = document.getElementById('pa-inventory-section');
+    if (invEl && data.inventory && data.inventory.length > 0) {
+        let invHtml = '<div class="pa-inventory">' +
+            '<div class="action-group-label">Inventory (' + data.inventory.length + ')</div>' +
+            '<div class="pa-inv-list">';
+        for (const item of data.inventory) {
+            // Try to find item name from loaded items data
+            const itemData = state.items.find(i => i.id === item.id);
+            const itemName = itemData ? itemData.name : item.id;
+            const itemIcon = itemData ? itemData.icon : null;
+            invHtml += '<div class="pa-inv-item">' +
+                iconImg(itemIcon, 20) +
+                '<span class="pa-inv-name">' + esc(itemName) + '</span>' +
+                '<span class="pa-inv-qty">x' + (item.qty || 1) + '</span>' +
+            '</div>';
+        }
+        invHtml += '</div></div>';
+        invEl.innerHTML = invHtml;
+    }
+
+    // Party pals section
+    const partyEl = document.getElementById('pa-party-section');
+    if (partyEl && data.party_pals && data.party_pals.length > 0) {
+        let partyHtml = '<div class="pa-party">' +
+            '<div class="action-group-label">Party Pals (' + data.party_pals.length + ')</div>' +
+            '<div class="pa-party-grid">';
+        for (const pal of data.party_pals) {
+            // Try to find pal data from palDb
+            const palData = state.palDb[pal.id];
+            const palName = pal.nickname || (palData ? palData.name : pal.id) || pal.id;
+            const palIcon = palData ? palData.icon : null;
+            const levelStr = pal.level != null ? 'Lv' + pal.level : '';
+
+            let hpBarStr = '';
+            if (pal.hp != null && pal.max_hp != null && pal.max_hp > 0) {
+                const pct = Math.min((pal.hp / pal.max_hp) * 100, 100).toFixed(0);
+                hpBarStr = '<div class="pa-pal-hp-bg"><div class="pa-pal-hp-fill" style="width:' + pct + '%"></div></div>';
+            }
+
+            partyHtml += '<div class="pa-pal-card">' +
+                iconImg(palIcon, 28) +
+                '<div class="pa-pal-info">' +
+                    '<div class="pa-pal-name">' + esc(palName) + '</div>' +
+                    '<div class="pa-pal-meta">' +
+                        (pal.hp != null ? pal.hp + '/' + (pal.max_hp || '?') + ' HP' : '') +
+                    '</div>' +
+                '</div>' +
+                '<span class="pa-pal-level">' + levelStr + '</span>' +
+                hpBarStr +
+            '</div>';
+        }
+        partyHtml += '</div></div>';
+        partyEl.innerHTML = partyHtml;
+    }
 }
 
 function updateSourceBadge() {
     const badge = document.getElementById('chip-source');
-    if (state.playerSource === 'rest_api') {
+    if (state.playerSource === 'lua_mod') {
+        badge.textContent = 'MOD';
+        badge.className = 'chip mod-src';
+    } else if (state.playerSource === 'rest_api') {
         badge.textContent = 'REST';
         badge.className = 'chip rest';
     } else {
