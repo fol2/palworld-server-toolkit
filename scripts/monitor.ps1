@@ -483,7 +483,7 @@ $btnLiveEdit.Add_Click({
                 "Palworld Monitor", "OK", "Error") | Out-Null
             return
         }
-        Start-Process powershell.exe -ArgumentList "-ExecutionPolicy", "Bypass", "-File", $script:LiveEditorSc -WindowStyle Minimized
+        Start-Process powershell.exe -ArgumentList "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", $script:LiveEditorSc -WindowStyle Hidden
         Start-Sleep -Seconds 2
         Start-Process "http://localhost:8213"
         Update-UI
@@ -587,7 +587,7 @@ $btnRestart.Add_Click({
 
     # 4. Start Live Editor
     if (Test-Path $script:LiveEditorSc) {
-        Start-Process powershell.exe -ArgumentList "-ExecutionPolicy", "Bypass", "-File", $script:LiveEditorSc -WindowStyle Minimized
+        Start-Process powershell.exe -ArgumentList "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", $script:LiveEditorSc -WindowStyle Hidden
         Start-Sleep -Seconds 2
     }
 

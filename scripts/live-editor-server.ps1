@@ -37,6 +37,39 @@ $script:WaypointsFile = Join-Path $script:IpcDir "waypoints.json"
 $script:ItemsCache = $null
 $script:PalsCache = $null
 $script:PalDbCache = $null
+$script:ActiveSkillsCache = $null
+$script:PassiveSkillsCache = $null
+$script:IconMap = @{}
+$script:FullBodyMap = @{}
+$script:IconDir = $null
+$script:PartnerSkills = $null
+
+# ── Icon mapping ────────────────────────────────────────────────────────────────
+function Build-IconMap {
+    Write-Host "[LiveEditor] Building icon mapping..." -ForegroundColor Cyan
+    $script:IconDir = Join-Path $script:ProjectRoot "tools\PalworldSavePal\ui\_app\immutable\assets"
+    if (-not (Test-Path $script:IconDir)) {
+        Write-Host "[LiveEditor]   Icon directory not found, skipping" -ForegroundColor Yellow
+        return
+    }
+
+    $files = Get-ChildItem -Path $script:IconDir -Filter "*.webp" -File
+    foreach ($f in $files) {
+        # Strip hash: t_alpaca_icon_normal.CSixLxRP.webp → t_alpaca_icon_normal
+        $baseName = $f.Name -replace '\.[A-Za-z0-9_-]+\.webp$', ''
+        if ($baseName -and -not $script:IconMap.ContainsKey($baseName)) {
+            $script:IconMap[$baseName] = $f.Name
+        }
+        # Full-body images: files whose base name does NOT start with t_ and does NOT contain _icon_
+        if ($baseName -and $baseName -notmatch '^t_' -and $baseName -notmatch '_icon_') {
+            $lowerBase = $baseName.ToLower()
+            if (-not $script:FullBodyMap.ContainsKey($lowerBase)) {
+                $script:FullBodyMap[$lowerBase] = $f.Name
+            }
+        }
+    }
+    Write-Host "[LiveEditor]   Mapped $($script:IconMap.Count) icons, $($script:FullBodyMap.Count) full-body images" -ForegroundColor Green
+}
 
 # ── REST API helper ──────────────────────────────────────────────────────────────
 
@@ -106,13 +139,56 @@ function Load-Items {
                 $name = $pspL10n.$id.localized_name
             }
 
+            $desc = $null
+            if ($pspL10n -and $pspL10n.PSObject.Properties[$id]) {
+                $desc = $pspL10n.$id.description
+            }
+
+            # Build dynamic sub-object if present
+            $dynObj = $null
+            if ($meta.dynamic) {
+                $dynObj = @{
+                    type          = $meta.dynamic.type
+                    durability    = $meta.dynamic.durability
+                    magazine_size = $meta.dynamic.magazine_size
+                    passive_skills = if ($meta.dynamic.passive_skills) { @($meta.dynamic.passive_skills) } else { @() }
+                }
+            }
+
+            # Build effect sub-object if present
+            $effectObj = $null
+            if ($meta.effect) {
+                $mods = @()
+                if ($meta.effect.modifiers) {
+                    foreach ($m in $meta.effect.modifiers) {
+                        $mods += @{ type = $m.type; value = $m.value }
+                    }
+                }
+                $effectObj = @{
+                    duration  = $meta.effect.duration
+                    modifiers = $mods
+                }
+            }
+
             $items[$id] = @{
-                id        = $id
-                name      = $name
-                group     = $meta.group
-                rarity    = $meta.rarity
-                max_stack = $meta.max_stack_count
-                sort_id   = $meta.sort_id
+                id                = $id
+                name              = $name
+                group             = $meta.group
+                rarity            = $meta.rarity
+                max_stack         = $meta.max_stack_count
+                sort_id           = $meta.sort_id
+                weight            = $meta.weight
+                price             = $meta.price
+                rank              = $meta.rank
+                icon              = $meta.icon
+                description       = $desc
+                type_a            = $meta.type_a
+                type_b            = $meta.type_b
+                damage            = $meta.damage
+                defense           = $meta.defense
+                corruption_factor = $meta.corruption_factor
+                dynamic           = $dynObj
+                effect            = $effectObj
             }
         }
         Write-Host "[LiveEditor]   PSP: $($items.Count) items loaded" -ForegroundColor DarkGray
@@ -128,12 +204,17 @@ function Load-Items {
             $name = $match.Groups[2].Value
             if (-not $items.ContainsKey($id)) {
                 $items[$id] = @{
-                    id        = $id
-                    name      = $name
-                    group     = "Unknown"
-                    rarity    = 0
-                    max_stack = 9999
-                    sort_id   = 99999
+                    id          = $id
+                    name        = $name
+                    group       = "Unknown"
+                    rarity      = 0
+                    max_stack   = 9999
+                    sort_id     = 99999
+                    weight      = $null
+                    price       = $null
+                    rank        = $null
+                    icon        = $null
+                    description = $null
                 }
                 $added++
             }
@@ -144,11 +225,23 @@ function Load-Items {
     # Convert to sorted array
     $script:ItemsCache = $items.Values | Sort-Object { $_.sort_id }, { $_.name } | ForEach-Object {
         [PSCustomObject]@{
-            id        = $_.id
-            name      = $_.name
-            group     = $_.group
-            rarity    = $_.rarity
-            max_stack = $_.max_stack
+            id                = $_.id
+            name              = $_.name
+            group             = $_.group
+            rarity            = $_.rarity
+            max_stack         = $_.max_stack
+            weight            = $_.weight
+            price             = $_.price
+            rank              = $_.rank
+            icon              = $_.icon
+            description       = $_.description
+            type_a            = $_.type_a
+            type_b            = $_.type_b
+            damage            = $_.damage
+            defense           = $_.defense
+            corruption_factor = $_.corruption_factor
+            dynamic           = $_.dynamic
+            effect            = $_.effect
         }
     }
     Write-Host "[LiveEditor]   Total: $($script:ItemsCache.Count) items" -ForegroundColor Green
@@ -199,6 +292,14 @@ function Load-PalDb {
     $elemL10n  = if (Test-Path $elementsL10n)  { Get-Content $elementsL10n  -Raw | ConvertFrom-Json } else { $null }
     $workL10n  = if (Test-Path $workL10nPath)  { Get-Content $workL10nPath  -Raw | ConvertFrom-Json } else { $null }
 
+    # Load partner skills data
+    $partnerSkillsPath = Join-Path $script:ProjectRoot "data\partner_skills.json"
+    $partnerSkillsData = $null
+    if (Test-Path $partnerSkillsPath) {
+        $partnerSkillsData = Get-Content $partnerSkillsPath -Raw | ConvertFrom-Json
+        Write-Host "[LiveEditor]   Partner skills: loaded" -ForegroundColor DarkGray
+    }
+
     $result = @()
     foreach ($prop in $palsData.PSObject.Properties) {
         $id = $prop.Name
@@ -247,24 +348,147 @@ function Load-PalDb {
             }
         }
 
+        # Skill set (convert PSObject to hashtable)
+        $skillSet = @{}
+        if ($pal.skill_set) {
+            foreach ($sp in $pal.skill_set.PSObject.Properties) {
+                $skillSet[$sp.Name] = $sp.Value
+            }
+        }
+
+        # Full-body image lookup
+        $bodyImage = $null
+        $idLower = $id.ToLower()
+        if ($script:FullBodyMap.ContainsKey($idLower)) {
+            $bodyImage = $idLower
+        }
+
+        # Partner skill lookup
+        $psName = $null
+        $psDesc = $null
+        if ($partnerSkillsData) {
+            try {
+                $ps = $partnerSkillsData.$id
+                if ($ps) {
+                    $psName = $ps.name
+                    $psDesc = $ps.description
+                }
+            } catch { }
+        }
+
         $result += [PSCustomObject]@{
-            id             = $id
-            name           = $name
-            description    = $desc
-            elements       = $elements
-            rarity         = $pal.rarity
-            hp             = if ($pal.scaling) { $pal.scaling.hp }      else { $null }
-            attack         = if ($pal.scaling) { $pal.scaling.attack }  else { $null }
-            defense        = if ($pal.scaling) { $pal.scaling.defense } else { $null }
-            work           = $work
-            is_boss        = $pal.is_boss
-            pal_deck_index = $pal.pal_deck_index
-            food_amount    = $pal.food_amount
+            id                   = $id
+            name                 = $name
+            description          = $desc
+            elements             = $elements
+            rarity               = $pal.rarity
+            hp                   = if ($pal.scaling) { $pal.scaling.hp }      else { $null }
+            attack               = if ($pal.scaling) { $pal.scaling.attack }  else { $null }
+            defense              = if ($pal.scaling) { $pal.scaling.defense } else { $null }
+            work                 = $work
+            is_boss              = $pal.is_boss
+            pal_deck_index       = $pal.pal_deck_index
+            food_amount          = $pal.food_amount
+            icon                 = $pal.icon
+            image                = $bodyImage
+            size                 = $pal.size
+            nocturnal            = $pal.nocturnal
+            predator             = $pal.predator
+            genus_category       = $pal.genus_category
+            male_probability     = $pal.male_probability
+            combi_rank           = $pal.combi_rank
+            capture_rate_correct = $pal.capture_rate_correct
+            run_speed            = $pal.run_speed
+            ride_sprint_speed    = $pal.ride_sprint_speed
+            max_full_stomach     = $pal.max_full_stomach
+            stamina              = $pal.stamina
+            skill_set            = $skillSet
+            partner_skill_name   = if ($psName) { $psName } else { "" }
+            partner_skill_desc   = if ($psDesc) { $psDesc } else { "" }
         }
     }
 
     $script:PalDbCache = $result | Sort-Object name
     Write-Host "[LiveEditor]   PalDb: $($script:PalDbCache.Count) pals loaded" -ForegroundColor Green
+}
+
+# ── Load skill reference data ──────────────────────────────────────────────────
+function Load-Skills {
+    Write-Host "[LiveEditor] Loading skill reference data..." -ForegroundColor Cyan
+
+    $dataDir = Join-Path $script:ProjectRoot "tools\PalworldSavePal\data\json"
+
+    # Active skills
+    $activeSkillsPath = Join-Path $dataDir "active_skills.json"
+    $activeSkillsL10n = Join-Path $dataDir "l10n\en\active_skills.json"
+
+    if (Test-Path $activeSkillsPath) {
+        $rawActive = Get-Content $activeSkillsPath -Raw | ConvertFrom-Json
+        $l10nActive = if (Test-Path $activeSkillsL10n) { Get-Content $activeSkillsL10n -Raw | ConvertFrom-Json } else { $null }
+
+        $activeList = @()
+        foreach ($prop in $rawActive.PSObject.Properties) {
+            $rawId = $prop.Name
+            $skill = $prop.Value
+            # Strip EPalWazaID:: prefix for matching with pal skill_set
+            $cleanId = $rawId -replace '^EPalWazaID::', ''
+
+            $name = $cleanId
+            $desc = $null
+            if ($l10nActive -and $l10nActive.PSObject.Properties[$rawId]) {
+                $l10n = $l10nActive.$rawId
+                if ($l10n.localized_name) { $name = $l10n.localized_name }
+                if ($l10n.description) { $desc = $l10n.description }
+            }
+
+            $activeList += [PSCustomObject]@{
+                id          = $cleanId
+                raw_id      = $rawId
+                name        = $name
+                description = $desc
+                element     = $skill.element
+                power       = $skill.power
+                cool_time   = $skill.cool_time
+            }
+        }
+        $script:ActiveSkillsCache = $activeList
+        Write-Host "[LiveEditor]   Active skills: $($activeList.Count)" -ForegroundColor DarkGray
+    }
+
+    # Passive skills
+    $passiveSkillsPath = Join-Path $dataDir "passive_skills.json"
+    $passiveSkillsL10n = Join-Path $dataDir "l10n\en\passive_skills.json"
+
+    if (Test-Path $passiveSkillsPath) {
+        $rawPassive = Get-Content $passiveSkillsPath -Raw | ConvertFrom-Json
+        $l10nPassive = if (Test-Path $passiveSkillsL10n) { Get-Content $passiveSkillsL10n -Raw | ConvertFrom-Json } else { $null }
+
+        $passiveList = @()
+        foreach ($prop in $rawPassive.PSObject.Properties) {
+            $id = $prop.Name
+            $skill = $prop.Value
+            if ($skill.disabled) { continue }
+
+            $name = $id
+            $desc = $null
+            if ($l10nPassive -and $l10nPassive.PSObject.Properties[$id]) {
+                $l10n = $l10nPassive.$id
+                if ($l10n.localized_name) { $name = $l10n.localized_name }
+                if ($l10n.description) { $desc = $l10n.description }
+            }
+
+            $passiveList += [PSCustomObject]@{
+                id          = $id
+                name        = $name
+                description = $desc
+                rank        = $skill.rank
+            }
+        }
+        $script:PassiveSkillsCache = $passiveList
+        Write-Host "[LiveEditor]   Passive skills: $($passiveList.Count)" -ForegroundColor DarkGray
+    }
+
+    Write-Host "[LiveEditor]   Skills loaded" -ForegroundColor Green
 }
 
 # ── Server status helpers ───────────────────────────────────────────────────────
@@ -345,6 +569,7 @@ $script:MimeTypes = @{
     ".png"  = "image/png"
     ".svg"  = "image/svg+xml"
     ".ico"  = "image/x-icon"
+    ".webp" = "image/webp"
 }
 
 # ── HTTP request handler ────────────────────────────────────────────────────────
@@ -410,6 +635,7 @@ function Handle-Request {
                             ping        = $rp.ping
                             location_x  = $rp.location_x
                             location_y  = $rp.location_y
+                            location_z  = $rp.location_z
                             level       = $rp.level
                         }
                     }
@@ -446,7 +672,7 @@ function Handle-Request {
         }
 
         if ($path -eq "/api/items" -and $method -eq "GET") {
-            $body = $script:ItemsCache | ConvertTo-Json -Depth 2
+            $body = $script:ItemsCache | ConvertTo-Json -Depth 5
             Send-JsonResponse $rsp $body
             return
         }
@@ -464,6 +690,74 @@ function Handle-Request {
                 $body = "[]"
             }
             Send-JsonResponse $rsp $body
+            return
+        }
+
+        if ($path -eq "/api/active-skills" -and $method -eq "GET") {
+            if ($script:ActiveSkillsCache) {
+                $body = $script:ActiveSkillsCache | ConvertTo-Json -Depth 3
+            } else {
+                $body = "[]"
+            }
+            Send-JsonResponse $rsp $body
+            return
+        }
+
+        if ($path -eq "/api/passive-skills" -and $method -eq "GET") {
+            if ($script:PassiveSkillsCache) {
+                $body = $script:PassiveSkillsCache | ConvertTo-Json -Depth 3
+            } else {
+                $body = "[]"
+            }
+            Send-JsonResponse $rsp $body
+            return
+        }
+
+        if ($path -match '^/api/icon/(.+)$' -and $method -eq "GET") {
+            $iconName = $Matches[1]
+            if ($script:IconMap.ContainsKey($iconName) -and $script:IconDir) {
+                $iconFile = Join-Path $script:IconDir $script:IconMap[$iconName]
+                if (Test-Path $iconFile) {
+                    $rsp.ContentType = "image/webp"
+                    $rsp.Headers.Add("Cache-Control", "public, max-age=86400")
+                    $bytes = [System.IO.File]::ReadAllBytes($iconFile)
+                    $rsp.ContentLength64 = $bytes.Length
+                    $rsp.OutputStream.Write($bytes, 0, $bytes.Length)
+                } else {
+                    $rsp.StatusCode = 404
+                    $msg = [System.Text.Encoding]::UTF8.GetBytes("Icon file not found")
+                    $rsp.OutputStream.Write($msg, 0, $msg.Length)
+                }
+            } else {
+                $rsp.StatusCode = 404
+                $msg = [System.Text.Encoding]::UTF8.GetBytes("Icon not mapped")
+                $rsp.OutputStream.Write($msg, 0, $msg.Length)
+            }
+            $rsp.Close()
+            return
+        }
+
+        if ($path -match '^/api/pal-image/(.+)$' -and $method -eq "GET") {
+            $imgName = $Matches[1].ToLower()
+            if ($script:FullBodyMap.ContainsKey($imgName) -and $script:IconDir) {
+                $imgFile = Join-Path $script:IconDir $script:FullBodyMap[$imgName]
+                if (Test-Path $imgFile) {
+                    $rsp.ContentType = "image/webp"
+                    $rsp.Headers.Add("Cache-Control", "public, max-age=86400")
+                    $bytes = [System.IO.File]::ReadAllBytes($imgFile)
+                    $rsp.ContentLength64 = $bytes.Length
+                    $rsp.OutputStream.Write($bytes, 0, $bytes.Length)
+                } else {
+                    $rsp.StatusCode = 404
+                    $msg = [System.Text.Encoding]::UTF8.GetBytes("Image file not found")
+                    $rsp.OutputStream.Write($msg, 0, $msg.Length)
+                }
+            } else {
+                $rsp.StatusCode = 404
+                $msg = [System.Text.Encoding]::UTF8.GetBytes("Image not mapped")
+                $rsp.OutputStream.Write($msg, 0, $msg.Length)
+            }
+            $rsp.Close()
             return
         }
 
@@ -760,9 +1054,11 @@ Write-Host "  +==================================+" -ForegroundColor Cyan
 Write-Host ""
 
 # Load data
+Build-IconMap
 Load-Items
 Load-Pals
 Load-PalDb
+Load-Skills
 
 # Ensure IPC directory exists
 if (-not (Test-Path $script:IpcDir)) { New-Item -ItemType Directory -Path $script:IpcDir -Force | Out-Null }

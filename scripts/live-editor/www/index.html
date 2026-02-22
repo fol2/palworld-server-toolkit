@@ -71,19 +71,45 @@
 
         <!-- ── Items Tab ────────────────────────────────────────────── -->
         <div class="tab-panel" id="tab-items">
-            <div class="single">
-                <div class="panel full-h">
-                    <div class="panel-head"><h3>GIVE ITEM</h3></div>
-                    <div class="form-row">
-                        <label>Target<select id="give-target" class="input"></select></label>
+            <div class="split resizable">
+                <div class="col">
+                    <div class="panel full-h">
+                        <div class="panel-head">
+                            <h3>ITEMS</h3>
+                            <span class="badge" id="item-count">0</span>
+                            <span class="spacer"></span>
+                            <select id="item-sort" class="input sort-select">
+                                <option value="default">Default</option>
+                                <option value="name">Name A-Z</option>
+                                <option value="rarity">Rarity</option>
+                                <option value="price">Price</option>
+                                <option value="weight">Weight</option>
+                            </select>
+                        </div>
+                        <div id="item-filters" class="filter-row"></div>
+                        <input type="text" id="give-search" class="input" placeholder="Search items...">
+                        <div id="item-list" class="scroll-list flex-fill">
+                            <div class="empty-state">Loading items...</div>
+                        </div>
                     </div>
-                    <input type="text" id="give-search" class="input" placeholder="Search items...">
-                    <div id="item-list" class="scroll-list flex-fill">
-                        <div class="empty-state">Loading items...</div>
+                </div>
+                <div class="split-handle"></div>
+                <div class="col gap-col">
+                    <div class="panel full-h" id="item-detail-panel">
+                        <div class="panel-head"><h3>ITEM DETAILS</h3></div>
+                        <div id="item-detail" class="scroll-y">
+                            <div class="empty-state">Select an item from the list</div>
+                        </div>
                     </div>
-                    <div class="form-row inline">
-                        <label class="compact">Qty<input type="number" id="give-qty" class="input" value="1" min="1" max="9999"></label>
-                        <button id="btn-give" class="btn btn-accent" disabled>Give Item</button>
+                    <div class="panel">
+                        <div class="panel-head"><h3>GIVE ITEM</h3></div>
+                        <div class="form-row">
+                            <label>Target<select id="give-target" class="input"></select></label>
+                        </div>
+                        <div class="form-row inline">
+                            <label class="compact">Qty<input type="number" id="give-qty" class="input" value="1" min="1" max="9999"></label>
+                            <button id="btn-give" class="btn btn-accent" disabled>Give Item</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -91,19 +117,67 @@
 
         <!-- ── Pals Tab ─────────────────────────────────────────────── -->
         <div class="tab-panel" id="tab-pals">
-            <div class="single">
-                <div class="panel full-h">
-                    <div class="panel-head"><h3>SPAWN PAL</h3></div>
-                    <div class="form-row">
-                        <label>Target<select id="spawn-target" class="input"></select></label>
+            <div class="split resizable">
+                <div class="col">
+                    <div class="panel full-h">
+                        <div class="panel-head">
+                            <h3>PALS</h3>
+                            <span class="badge" id="pal-count">0</span>
+                            <span class="spacer"></span>
+                            <select id="pal-sort" class="input sort-select">
+                                <option value="name">Name A-Z</option>
+                                <option value="paldeck">Paldeck #</option>
+                                <option value="rarity">Rarity</option>
+                                <option value="hp">HP</option>
+                                <option value="attack">ATK</option>
+                                <option value="defense">DEF</option>
+                            </select>
+                            <select id="pal-order" class="input sort-select">
+                                <option value="asc">Ascending</option>
+                                <option value="desc">Descending</option>
+                            </select>
+                            <select id="pal-rarity-filter" class="input sort-select">
+                                <option value="">All Rarity</option>
+                                <option value="1">Common</option>
+                                <option value="2">Uncommon</option>
+                                <option value="3">Rare</option>
+                                <option value="4">Epic</option>
+                                <option value="5">Legendary</option>
+                            </select>
+                            <select id="pal-size-filter" class="input sort-select">
+                                <option value="">All Size</option>
+                                <option value="S">S</option>
+                                <option value="M">M</option>
+                                <option value="L">L</option>
+                                <option value="XL">XL</option>
+                            </select>
+                        </div>
+                        <div id="pal-filters" class="filter-row"></div>
+                        <div id="pal-work-filters" class="filter-row"></div>
+                        <div id="pal-ps-filters" class="filter-row"></div>
+                        <input type="text" id="spawn-search" class="input" placeholder="Search pals...">
+                        <div id="pal-list" class="scroll-list flex-fill">
+                            <div class="empty-state">Loading pals...</div>
+                        </div>
                     </div>
-                    <input type="text" id="spawn-search" class="input" placeholder="Search pals...">
-                    <div id="pal-list" class="scroll-list flex-fill">
-                        <div class="empty-state">Loading pals...</div>
+                </div>
+                <div class="split-handle"></div>
+                <div class="col gap-col">
+                    <div class="panel full-h" id="pal-detail-panel">
+                        <div class="panel-head"><h3>PAL DETAILS</h3></div>
+                        <div id="pal-detail" class="scroll-y">
+                            <div class="empty-state">Select a pal from the list</div>
+                        </div>
                     </div>
-                    <div class="form-row inline">
-                        <label class="compact">Level<input type="number" id="spawn-level" class="input" value="50" min="1" max="55"></label>
-                        <button id="btn-spawn" class="btn btn-accent" disabled>Spawn Pal</button>
+                    <div class="panel">
+                        <div class="panel-head"><h3>SPAWN PAL</h3></div>
+                        <div class="form-row">
+                            <label>Target<select id="spawn-target" class="input"></select></label>
+                        </div>
+                        <div class="form-row inline">
+                            <label class="compact">Level<input type="number" id="spawn-level" class="input" value="50" min="1" max="55"></label>
+                            <button id="btn-spawn" class="btn btn-accent" disabled>Spawn Pal</button>
+                        </div>
                     </div>
                 </div>
             </div>

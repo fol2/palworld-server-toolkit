@@ -228,6 +228,50 @@ body::before {
     min-height: 0;
 }
 
+.split.resizable {
+    grid-template-columns: 1fr 6px 1fr;
+}
+
+/* ── Split Handle (resizable divider) ─────────────────────────────────────── */
+
+.split-handle {
+    width: 6px;
+    cursor: col-resize;
+    position: relative;
+    border-radius: 3px;
+    transition: background 0.15s;
+}
+
+.split-handle::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 32px;
+    border-radius: 1px;
+    background: var(--border-light);
+    transition: background 0.15s, height 0.15s;
+}
+
+.split-handle:hover::after {
+    background: var(--accent);
+    height: 48px;
+    box-shadow: 0 0 8px var(--accent-dim);
+}
+
+.split-handle.active::after {
+    background: var(--accent);
+    height: 100%;
+    box-shadow: 0 0 12px var(--accent-dim);
+}
+
+body.resizing {
+    user-select: none;
+    cursor: col-resize;
+}
+
 .col {
     display: flex;
     flex-direction: column;
@@ -512,13 +556,23 @@ body::before {
 }
 
 .element-badge {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
     font-size: 9px;
     font-weight: 600;
     padding: 1px 5px;
     border-radius: 3px;
     line-height: 1.4;
 }
+.elem-icon {
+    width: 10px;
+    height: 10px;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+.elem-icon svg { width: 10px; height: 10px; }
 
 .pal-item-stats {
     font-size: 10px;
@@ -907,6 +961,797 @@ select.input {
     font-family: 'Fira Code', monospace;
     font-size: 11px;
 }
+
+/* ── Sort Select ───────────────────────────────────────────────────────────── */
+
+.sort-select {
+    padding: 3px 8px;
+    font-size: 10px;
+    min-width: 90px;
+}
+
+/* ── Icon Thumbnails ───────────────────────────────────────────────────────── */
+
+.icon-thumb {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.icon-thumb-lg {
+    width: 80px;
+    height: 80px;
+    border-radius: 6px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    object-fit: contain;
+}
+
+.icon-placeholder {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.icon-placeholder-lg {
+    width: 80px;
+    height: 80px;
+    border-radius: 6px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    color: var(--text-muted);
+}
+
+/* ── Rarity Dots ───────────────────────────────────────────────────────────── */
+
+.rarity-dots {
+    display: inline-flex;
+    gap: 2px;
+    margin-left: 4px;
+    flex-shrink: 0;
+}
+
+.rarity-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+}
+
+.rarity-0 { background: #666; }       /* Common — grey */
+.rarity-1 { background: #34D399; }    /* Uncommon — green */
+.rarity-2 { background: #60A5FA; }    /* Rare — blue */
+.rarity-3 { background: #A78BFA; }    /* Epic — purple */
+.rarity-4, .rarity-5 { background: #FBBF24; } /* Legendary — gold */
+
+.rarity-label-0 { color: #666; }
+.rarity-label-1 { color: #34D399; }
+.rarity-label-2 { color: #60A5FA; }
+.rarity-label-3 { color: #A78BFA; }
+.rarity-label-4, .rarity-label-5 { color: #FBBF24; }
+
+/* ── Enhanced List Items (with icons) ──────────────────────────────────────── */
+
+.list-item-icon {
+    padding: 5px 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    transition: background 0.1s;
+}
+
+.list-item-icon:hover { background: var(--bg-hover); }
+.list-item-icon.selected {
+    background: var(--accent-dim);
+    border-left: 3px solid var(--accent);
+    padding-left: 7px;
+}
+
+.list-item-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.list-item-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.list-item-top .item-name {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.list-item-top .item-group {
+    color: var(--text-sec);
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.list-item-bottom {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: 'Fira Code', monospace;
+    flex-wrap: wrap;
+}
+
+/* ── Detail Panel ──────────────────────────────────────────────────────────── */
+
+.detail-header {
+    display: flex;
+    gap: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 10px;
+}
+
+.detail-header-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+}
+
+.detail-name {
+    font-weight: 600;
+    font-size: 16px;
+    letter-spacing: 0.3px;
+}
+
+.detail-id {
+    font-size: 10px;
+    font-family: 'Fira Code', monospace;
+    color: var(--text-muted);
+}
+
+.detail-desc {
+    font-size: 12px;
+    color: var(--text-sec);
+    line-height: 1.5;
+    margin-bottom: 10px;
+}
+
+.detail-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+.stat-label {
+    color: var(--text-sec);
+    font-weight: 500;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+}
+
+.stat-value {
+    font-family: 'Fira Code', monospace;
+    font-weight: 500;
+}
+
+/* ── Work Suitability Chips ───────────────────────────────────────────────── */
+
+.work-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.work-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 4px;
+    cursor: default;
+}
+
+.work-chip-icon {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--wc);
+}
+.work-chip-icon svg {
+    width: 22px;
+    height: 22px;
+}
+
+.work-chip-lvl {
+    font-family: 'Fira Code', monospace;
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--text-sec);
+}
+
+/* ── Mini work icons in pal list ─────────────────────────────────────────── */
+.mini-work {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+}
+.mini-work-icon {
+    width: 11px;
+    height: 11px;
+    display: inline-flex;
+    align-items: center;
+}
+.mini-work-icon svg { width: 11px; height: 11px; }
+.mini-work-lvl {
+    font-size: 9px;
+    font-family: 'Fira Code', monospace;
+    font-weight: 500;
+}
+.mini-size {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    border: 1px solid;
+    letter-spacing: 0.5px;
+    line-height: 1.3;
+}
+.mini-size.size-s  { color: #34D399; background: #34D39915; border-color: #34D39940; }
+.mini-size.size-m  { color: #60A5FA; background: #60A5FA15; border-color: #60A5FA40; }
+.mini-size.size-l  { color: #FBBF24; background: #FBBF2415; border-color: #FBBF2440; }
+.mini-size.size-xl { color: #F87171; background: #F8717115; border-color: #F8717140; }
+
+/* Filter pill icons (element + work + partner skill) */
+.elem-pill, .work-pill, .ps-pill { gap: 4px; }
+.elem-pill-icon, .work-pill-icon, .ps-pill-icon {
+    width: 14px;
+    height: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.elem-pill-icon svg, .work-pill-icon svg, .ps-pill-icon svg { width: 14px; height: 14px; }
+
+/* ── Detail Section Labels ─────────────────────────────────────────────────── */
+
+.detail-section-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-top: 10px;
+    margin-bottom: 4px;
+}
+
+/* ── Element Badges (detail panel) ─────────────────────────────────────────── */
+
+.detail-elements {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.detail-elements .element-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+}
+.detail-elements .elem-icon { width: 13px; height: 13px; }
+.detail-elements .elem-icon svg { width: 13px; height: 13px; }
+
+/* ── Pal List Item with Icon ───────────────────────────────────────────────── */
+
+.pal-item-rich .icon-thumb {
+    width: 40px;
+    height: 40px;
+}
+
+.pal-item-rich .icon-placeholder {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+}
+
+.pal-item-rich {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pal-item-rich-info {
+    flex: 1;
+    min-width: 0;
+}
+
+/* ── Filter Pills ─────────────────────────────────────────────────────────── */
+
+.filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 2px 0;
+    flex-shrink: 0;
+}
+
+.filter-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-sec);
+    font-size: 10px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+    letter-spacing: 0.3px;
+}
+
+.filter-pill:hover {
+    background: var(--bg-hover);
+    color: var(--text);
+}
+
+.filter-pill.active {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--text);
+    border-left: 3px solid var(--accent);
+    padding-left: 7px;
+}
+
+.filter-pill .pill-count {
+    font-size: 9px;
+    color: var(--text-muted);
+    font-family: 'Fira Code', monospace;
+}
+
+.filter-pill.active .pill-count {
+    color: var(--text-sec);
+}
+
+/* Element pills use custom colour */
+.filter-pill.elem-active {
+    background: var(--pill-color-dim, var(--accent-dim));
+    border-color: var(--pill-color, var(--accent));
+    color: var(--pill-color, var(--text));
+    border-left: 3px solid var(--pill-color, var(--accent));
+    padding-left: 7px;
+}
+
+/* Boss toggle */
+.filter-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-sec);
+    font-size: 10px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+    margin-left: auto;
+}
+
+.filter-toggle:hover { background: var(--bg-hover); }
+.filter-toggle.active {
+    background: rgba(251, 191, 36, 0.1);
+    border-color: var(--amber);
+    color: var(--amber);
+}
+
+.filter-toggle input[type="checkbox"] {
+    display: none;
+}
+
+/* ── Stat Bars (HP/ATK/DEF) ───────────────────────────────────────────────── */
+
+.stat-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+}
+
+.stat-bar-label {
+    flex: 0 0 50px;
+    color: var(--text-sec);
+    font-size: 10px;
+    font-weight: 500;
+    text-align: right;
+    letter-spacing: 0.5px;
+}
+
+.stat-bar-bg {
+    flex: 1;
+    height: 4px;
+    background: var(--bg);
+    border-radius: 2px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+
+.stat-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.stat-bar-fill.hp  { background: var(--green); }
+.stat-bar-fill.atk { background: var(--orange); }
+.stat-bar-fill.def { background: var(--blue); }
+.stat-bar-fill.sta { background: var(--purple); }
+
+.stat-bar-val {
+    flex: 0 0 36px;
+    font-family: 'Fira Code', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text);
+}
+
+/* ── Skill Table ──────────────────────────────────────────────────────────── */
+
+.skill-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    margin-top: 4px;
+}
+
+.skill-table th {
+    text-align: left;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    padding: 4px 6px;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+}
+
+.skill-table td {
+    padding: 4px 6px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+.skill-table tr:nth-child(even) {
+    background: var(--bg);
+}
+
+.skill-table tr:nth-child(odd) {
+    background: var(--bg-surface);
+}
+
+.skill-table .skill-lvl {
+    font-family: 'Fira Code', monospace;
+    font-size: 10px;
+    color: var(--amber);
+    font-weight: 600;
+    width: 30px;
+}
+
+.skill-table .skill-name {
+    font-weight: 500;
+}
+
+.skill-table .skill-elem-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    vertical-align: middle;
+}
+
+.skill-table .skill-power,
+.skill-table .skill-cd {
+    font-family: 'Fira Code', monospace;
+    font-size: 10px;
+    color: var(--text-sec);
+    width: 40px;
+}
+
+.skill-table .skill-desc {
+    font-size: 10px;
+    color: var(--text-muted);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.skill-table tr:hover .skill-desc {
+    white-space: normal;
+    overflow: visible;
+}
+
+/* ── Food Effect / Buff Cards ─────────────────────────────────────────────── */
+
+.buff-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.buff-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: rgba(52, 211, 153, 0.08);
+    border: 1px solid rgba(52, 211, 153, 0.2);
+    color: var(--green);
+    font-size: 11px;
+    font-weight: 500;
+    font-family: 'Fira Code', monospace;
+}
+
+.buff-duration {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: 'Fira Code', monospace;
+    margin-top: 2px;
+}
+
+/* ── Behaviour Trait Badges ───────────────────────────────────────────────── */
+
+.trait-badges {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+
+.trait-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+.trait-badge.size-badge {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-light);
+    color: var(--text);
+}
+
+.trait-badge.nocturnal {
+    background: rgba(96, 165, 250, 0.1);
+    border: 1px solid rgba(96, 165, 250, 0.25);
+    color: var(--blue);
+}
+
+.trait-badge.predator {
+    background: rgba(248, 113, 113, 0.1);
+    border: 1px solid rgba(248, 113, 113, 0.25);
+    color: var(--red);
+}
+
+/* ── Type Badges (Item Detail) ────────────────────────────────────────────── */
+
+.type-badges {
+    display: flex;
+    gap: 4px;
+    margin-top: 2px;
+}
+
+.type-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-light);
+    color: var(--text-sec);
+    letter-spacing: 0.3px;
+}
+
+/* ── Passive Skill List ───────────────────────────────────────────────────── */
+
+.passive-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.passive-item {
+    padding: 6px 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+}
+
+.passive-item-name {
+    font-weight: 500;
+    font-size: 11px;
+}
+
+.passive-item-desc {
+    font-size: 10px;
+    color: var(--text-sec);
+    margin-top: 2px;
+    line-height: 1.4;
+}
+
+/* ── Classified Appendix (breeding/capture) ───────────────────────────────── */
+
+.appendix-section {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border);
+}
+
+.appendix-section .detail-stats {
+    opacity: 0.8;
+}
+
+.appendix-section .stat-item {
+    font-size: 10px;
+}
+
+.appendix-section .stat-label {
+    font-size: 9px;
+}
+
+/* ── Pal Portrait (full-body image in detail) ────────────────────────────── */
+
+.pal-portrait-section {
+    display: flex;
+    justify-content: center;
+    padding: 10px 0;
+}
+
+.pal-portrait {
+    width: auto;
+    height: 220px;
+    max-width: 260px;
+    border-radius: 8px;
+    object-fit: contain;
+}
+
+/* ── Partner Skill Card ───────────────────────────────────────────────────── */
+
+.partner-card {
+    --ps-color: var(--cyan);
+    margin: 10px 0;
+    padding: 16px;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--ps-color) 6%, transparent), color-mix(in srgb, var(--ps-color) 3%, transparent));
+    border: 1px solid color-mix(in srgb, var(--ps-color) 20%, transparent);
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+}
+.partner-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px;
+    height: 100%;
+    background: var(--ps-color);
+    border-radius: 3px 0 0 3px;
+}
+
+.partner-card-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 10px;
+}
+
+.ps-icon-wrap {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ps-color);
+    background: color-mix(in srgb, var(--ps-color) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ps-color) 18%, transparent);
+    border-radius: 10px;
+}
+.ps-icon-wrap svg {
+    width: 30px;
+    height: 30px;
+}
+
+.partner-card-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+
+.partner-card-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--ps-color);
+    line-height: 1.2;
+}
+
+.partner-card-desc {
+    font-size: 12px;
+    color: var(--text-sec);
+    line-height: 1.6;
+    padding-left: 62px;
+}
+
+/* Type-specific accent colours */
+.ps-type-fly    { --ps-color: #67E8F9; }
+.ps-type-ride   { --ps-color: #FBBF24; }
+.ps-type-swim   { --ps-color: #60A5FA; }
+.ps-type-combat { --ps-color: #F87171; }
+.ps-type-shield { --ps-color: #94A3B8; }
+.ps-type-heal   { --ps-color: #F472B6; }
+.ps-type-ranch  { --ps-color: #FB923C; }
+.ps-type-carry  { --ps-color: #A78BFA; }
+.ps-type-speed  { --ps-color: #34D399; }
+.ps-type-sanity { --ps-color: #818CF8; }
+.ps-type-buff   { --ps-color: #FBBF24; }
+.ps-type-gun    { --ps-color: #EF4444; }
+.ps-type-thief  { --ps-color: #C084FC; }
 
 /* ── Utility Classes ───────────────────────────────────────────────────────── */
 
