@@ -8,6 +8,9 @@ const explorerState = {
     lastResult: null,
     history: [],     // breadcrumb trail: [{ className, instanceIndex, propertyPath }]
     loading: false,
+    hintShown: false, // whether the post-dump drill hint has been shown
+    probeResult: null, // cached probe discovery result
+    probeDetailsOpen: false,
 };
 
 /* ── API ──────────────────────────────────────────────────────────────────── */
@@ -18,6 +21,19 @@ async function apiDump(params) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(params),
+        });
+        return await res.json();
+    } catch (e) {
+        return { success: false, message: 'HTTP error: ' + e.message };
+    }
+}
+
+async function apiProbe(force) {
+    try {
+        const res = await fetch('/api/probe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ force: !!force }),
         });
         return await res.json();
     } catch (e) {
@@ -44,6 +60,108 @@ function syncControls() {
     document.getElementById('class-name').value = explorerState.className;
     document.getElementById('inst-idx').value = explorerState.instanceIndex;
     document.getElementById('prop-path').value = explorerState.propertyPath;
+}
+
+/* ── Probe (Auto-Discovery) ──────────────────────────────────────────────── */
+
+async function doProbe(force) {
+    const btn = document.getElementById('btn-probe');
+    btn.disabled = true;
+    btn.textContent = 'Probing...';
+    setStatus('Running auto-discovery probe...', 'loading');
+
+    const result = await apiProbe(force);
+
+    btn.disabled = false;
+    btn.textContent = 'Probe';
+
+    if (result && result.success) {
+        let data;
+        try {
+            data = typeof result.message === 'string' ? JSON.parse(result.message) : result.message;
+        } catch (e) {
+            setStatus('Probe failed: invalid response', 'err');
+            return;
+        }
+
+        explorerState.probeResult = data;
+        renderProbePanel(data);
+
+        const props = data.properties || {};
+        const found = Object.values(props).filter(v => v !== 'NOT_FOUND').length;
+        const total = Object.keys(props).length;
+        setStatus('Probe complete: ' + found + '/' + total + ' properties discovered', 'ok');
+    } else {
+        const msg = result ? result.message : 'No response';
+        setStatus('Probe failed: ' + msg, 'err');
+        renderProbeBadge('fail', 'FAILED');
+    }
+}
+
+function renderProbePanel(data) {
+    const panel = document.getElementById('probe-panel');
+    const grid = document.getElementById('probe-grid');
+    panel.classList.add('visible');
+
+    const props = data.properties || {};
+    const found = Object.values(props).filter(v => v !== 'NOT_FOUND').length;
+    const total = Object.keys(props).length;
+
+    if (found > 0) {
+        renderProbeBadge('ok', found + '/' + total + ' MAPPED');
+    } else {
+        renderProbeBadge('pending', '0 FOUND');
+    }
+
+    // Build the detail grid
+    let html = '';
+    const friendlyNames = {
+        ps_level: 'Player Level',
+        ps_pawn: 'Pawn Reference',
+        pawn_hp: 'Pawn HP',
+        pawn_max_hp: 'Pawn Max HP',
+        pawn_params: 'Stats Component',
+        pawn_inventory: 'Inventory Component',
+        pawn_pal_storage: 'Pal Storage',
+        param_hp: 'Param HP',
+        param_max_hp: 'Param Max HP',
+        param_attack: 'Attack',
+        param_defense: 'Defense',
+        inv_slots: 'Inventory Slots',
+    };
+
+    for (const [key, val] of Object.entries(props)) {
+        const label = friendlyNames[key] || key;
+        const isMissing = val === 'NOT_FOUND';
+        html += '<div class="probe-item">' +
+            '<span class="probe-key">' + esc(label) + '</span>' +
+            '<span class="probe-val' + (isMissing ? ' missing' : '') + '">' +
+            esc(isMissing ? 'not found' : val) + '</span>' +
+            '</div>';
+    }
+
+    grid.innerHTML = html;
+
+    // Auto-show details if some properties weren't found
+    if (found < total && found > 0) {
+        grid.style.display = 'grid';
+        explorerState.probeDetailsOpen = true;
+        document.getElementById('probe-toggle').textContent = 'Hide details';
+    }
+}
+
+function renderProbeBadge(type, text) {
+    const badge = document.getElementById('probe-badge');
+    badge.className = 'probe-badge ' + type;
+    badge.textContent = text;
+}
+
+function toggleProbeDetails() {
+    const grid = document.getElementById('probe-grid');
+    const toggle = document.getElementById('probe-toggle');
+    explorerState.probeDetailsOpen = !explorerState.probeDetailsOpen;
+    grid.style.display = explorerState.probeDetailsOpen ? 'grid' : 'none';
+    toggle.textContent = explorerState.probeDetailsOpen ? 'Hide details' : 'Show details';
 }
 
 /* ── Main Dump ────────────────────────────────────────────────────────────── */
@@ -192,7 +310,20 @@ function renderProperties(props) {
         return;
     }
 
-    let html = '<table><thead><tr>' +
+    let html = '';
+
+    // Show a one-time hint if there are drillable properties
+    if (!explorerState.hintShown) {
+        const hasDrillable = props.some(p => isDrillableType(p.type, p.value));
+        if (hasDrillable) {
+            html += '<div class="explorer-hint">Click <strong>cyan values</strong> or ' +
+                '&ldquo;Drill &rarr;&rdquo; buttons to explore nested objects. ' +
+                'Use the breadcrumb bar above to navigate back.</div>';
+            explorerState.hintShown = true;
+        }
+    }
+
+    html += '<table><thead><tr>' +
         '<th>OFFSET</th><th>TYPE</th><th>NAME</th><th>VALUE</th><th></th>' +
         '</tr></thead><tbody>';
 
@@ -286,3 +417,146 @@ document.addEventListener('keydown', (e) => {
         doDump();
     }
 });
+
+/* ── Getting-Started Guide ───────────────────────────────────────────────── */
+
+function buildGuideHTML() {
+    return '<div class="explorer-guide">' +
+        '<h2>UObject Property Explorer</h2>' +
+        '<p>This tool lets you browse live game data from the running Palworld server. ' +
+        'It reads UObject properties directly from memory via the UE4SS mod.</p>' +
+
+        /* Auto-Discovery */
+        '<div class="explorer-guide-section">' +
+            '<h3>Auto-Discovery (Recommended)</h3>' +
+            '<div class="explorer-steps">' +
+                '<div class="explorer-step">' +
+                    '<div class="explorer-step-num">1</div>' +
+                    '<div class="explorer-step-text"><strong>Click &ldquo;Probe&rdquo;</strong> above. ' +
+                    'This automatically scans PalPlayerState and its sub-objects to find property names ' +
+                    'for player level, HP, inventory, pals, and stats. No manual browsing needed &mdash; ' +
+                    'the system discovers the right properties itself.</div>' +
+                '</div>' +
+                '<div class="explorer-step">' +
+                    '<div class="explorer-step-num">2</div>' +
+                    '<div class="explorer-step-text"><strong>Check the results</strong> in the ' +
+                    'Auto-Discovery panel. Green values = found, red = not found. ' +
+                    'The Live Editor dashboard will use these discovered names automatically ' +
+                    'to show player stats, HP, inventory, and pals.</div>' +
+                '</div>' +
+            '</div>' +
+            '<div class="explorer-hint" style="margin:8px 0 0 0">' +
+                '<strong>Prerequisite:</strong> the Palworld server must be running with MOD enabled, ' +
+                'and at least one player must be connected (so PalPlayerState instances exist).' +
+            '</div>' +
+        '</div>' +
+
+        /* Manual Exploration */
+        '<div class="explorer-guide-section">' +
+            '<h3>Manual Exploration (Advanced)</h3>' +
+            '<p style="font-size:11px;color:var(--text-sec);margin-bottom:8px">' +
+            'Use Dump Properties for deep-diving into any UObject class. ' +
+            'Useful for discovering properties that auto-discovery does not cover.</p>' +
+            '<div class="explorer-steps">' +
+                '<div class="explorer-step">' +
+                    '<div class="explorer-step-num">1</div>' +
+                    '<div class="explorer-step-text"><strong>Choose a class</strong> from the preset buttons, ' +
+                    'or type your own class name.</div>' +
+                '</div>' +
+                '<div class="explorer-step">' +
+                    '<div class="explorer-step-num">2</div>' +
+                    '<div class="explorer-step-text"><strong>Click &ldquo;Dump Properties&rdquo;</strong> to fetch all properties ' +
+                    'for that class from the live server.</div>' +
+                '</div>' +
+                '<div class="explorer-step">' +
+                    '<div class="explorer-step-num">3</div>' +
+                    '<div class="explorer-step-text"><strong>Browse the results.</strong> Values shown in ' +
+                    '<span style="color:var(--cyan)">cyan</span> (ObjectProperty, StructProperty) can be ' +
+                    '<strong>drilled into</strong> &mdash; click them to explore nested data.</div>' +
+                '</div>' +
+                '<div class="explorer-step">' +
+                    '<div class="explorer-step-num">4</div>' +
+                    '<div class="explorer-step-text"><strong>Use the breadcrumb bar</strong> above the results to navigate ' +
+                    'back to previous levels.</div>' +
+                '</div>' +
+            '</div>' +
+        '</div>' +
+
+        /* Preset Classes */
+        '<div class="explorer-guide-section">' +
+            '<h3>Preset Classes</h3>' +
+            '<div class="explorer-preset-list">' +
+                '<div class="explorer-preset-item"><code>PalPlayerState</code> ' +
+                    '<span>Player data: name, level, stats, inventory references</span></div>' +
+                '<div class="explorer-preset-item"><code>PalPlayerCharacter</code> ' +
+                    '<span>Character in the world: position, pawn, components</span></div>' +
+                '<div class="explorer-preset-item"><code>PalGameStateInGame</code> ' +
+                    '<span>Current game session: time, weather, world state</span></div>' +
+                '<div class="explorer-preset-item"><code>PalWorldSettings</code> ' +
+                    '<span>Server configuration values</span></div>' +
+            '</div>' +
+        '</div>' +
+
+        /* Value Colour Legend */
+        '<div class="explorer-guide-section">' +
+            '<h3>Value Colour Legend</h3>' +
+            '<div class="explorer-legend">' +
+                '<div class="explorer-legend-item">' +
+                    '<div class="explorer-legend-swatch" style="background:#34D399"></div>' +
+                    '<div class="explorer-legend-label">Numeric values (int, float, byte)</div>' +
+                '</div>' +
+                '<div class="explorer-legend-item">' +
+                    '<div class="explorer-legend-swatch" style="background:#34D399"></div>' +
+                    '<div class="explorer-legend-label">Boolean &mdash; true</div>' +
+                '</div>' +
+                '<div class="explorer-legend-item">' +
+                    '<div class="explorer-legend-swatch" style="background:#F87171"></div>' +
+                    '<div class="explorer-legend-label">Boolean &mdash; false</div>' +
+                '</div>' +
+                '<div class="explorer-legend-item">' +
+                    '<div class="explorer-legend-swatch" style="background:#FBBF24"></div>' +
+                    '<div class="explorer-legend-label">String / name / text</div>' +
+                '</div>' +
+                '<div class="explorer-legend-item">' +
+                    '<div class="explorer-legend-swatch" style="background:#22D3EE"></div>' +
+                    '<div class="explorer-legend-label">Object / struct (drillable)</div>' +
+                '</div>' +
+                '<div class="explorer-legend-item">' +
+                    '<div class="explorer-legend-swatch" style="background:#A78BFA"></div>' +
+                    '<div class="explorer-legend-label">Type column (property type)</div>' +
+                '</div>' +
+                '<div class="explorer-legend-item">' +
+                    '<div class="explorer-legend-swatch" style="background:#F87171"></div>' +
+                    '<div class="explorer-legend-label">Error reading value</div>' +
+                '</div>' +
+            '</div>' +
+        '</div>' +
+
+        /* Tips */
+        '<div class="explorer-guide-section">' +
+            '<h3>Tips</h3>' +
+            '<ul class="explorer-tips">' +
+                '<li><strong>Auto-discovery</strong> is the fastest way to get started &mdash; ' +
+                'just click Probe and the system maps property names automatically.</li>' +
+                '<li>The <strong>Instance #</strong> field lets you switch between multiple instances of the ' +
+                'same class (e.g. different connected players). Start at 0 for the first.</li>' +
+                '<li>Use <strong>Property Path</strong> to jump directly to a nested property without drilling ' +
+                'step by step (e.g. <code style="font-family:\'Fira Code\',monospace;font-size:10px;color:var(--cyan)">' +
+                'PawnPrivate.SomeComponent</code>).</li>' +
+                '<li><strong>Max Items</strong> limits how many properties are returned per request. ' +
+                'Increase it if you suspect properties are being cut off.</li>' +
+                '<li>Press <strong>Enter</strong> in any input field to trigger a dump without clicking the button.</li>' +
+            '</ul>' +
+        '</div>' +
+
+    '</div>';
+}
+
+function showExplorerGuide() {
+    document.getElementById('results').innerHTML = buildGuideHTML();
+    document.getElementById('results-info').style.display = 'none';
+}
+
+/* ── Initialisation ──────────────────────────────────────────────────────── */
+
+showExplorerGuide();

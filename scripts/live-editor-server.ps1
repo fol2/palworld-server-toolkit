@@ -788,6 +788,25 @@ function Handle-Request {
             return
         }
 
+        if ($path -eq "/api/probe" -and $method -eq "POST") {
+            $reader = New-Object System.IO.StreamReader($req.InputStream, $req.ContentEncoding)
+            $postBody = $reader.ReadToEnd()
+            $reader.Close()
+
+            $params = @{}
+            if ($postBody -and $postBody.Trim() -ne "") {
+                $cmdData = $postBody | ConvertFrom-Json
+                if ($cmdData.force) { $params["force"] = $true }
+            }
+
+            $cmdId = "probe_" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+            $result = Send-ModCommand -Id $cmdId -Type "probe_properties" -Params $params -TimeoutSec 15
+
+            $body = $result | ConvertTo-Json -Depth 5
+            Send-JsonResponse $rsp $body
+            return
+        }
+
         if ($path -eq "/api/command" -and $method -eq "POST") {
             $reader = New-Object System.IO.StreamReader($req.InputStream, $req.ContentEncoding)
             $postBody = $reader.ReadToEnd()

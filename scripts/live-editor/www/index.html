@@ -18,16 +18,17 @@
             <span class="server-name" id="server-name"></span>
         </div>
         <div class="status-right">
-            <span class="chip" id="chip-server">
+            <span class="chip" id="chip-server" title="Server process status">
                 <span class="chip-dot" id="status-dot"></span>
                 <span id="status-text">CHECKING</span>
             </span>
-            <span class="chip" id="chip-players">
+            <span class="chip" id="chip-players" title="Online players / max capacity">
                 <span id="player-count">-/32</span>
             </span>
-            <span class="chip" id="chip-source" title="Player data source"></span>
-            <a href="/explorer.html" class="chip" style="text-decoration:none;color:var(--purple)" title="UObject Explorer">EXPLORER</a>
-            <span class="chip" id="chip-mod"></span>
+            <span class="chip" id="chip-source" title="Player data source — MOD (live UE4SS), REST (API), or RCON (legacy)"></span>
+            <a href="/explorer.html" class="chip" style="text-decoration:none;color:var(--purple)" title="UObject Explorer — dev tool for browsing live game objects">EXPLORER</a>
+            <span class="chip" id="chip-mod" title="UE4SS mod status — required for Give/Spawn/Teleport commands"></span>
+            <span class="chip help-btn" onclick="toggleHelp()" title="Help &amp; Reference (press ?)">?</span>
         </div>
     </header>
 
@@ -63,7 +64,15 @@
                     <div class="panel full-h" id="player-actions-panel">
                         <div class="panel-head"><h3>PLAYER ACTIONS</h3></div>
                         <div id="player-actions-content" class="scroll-y">
-                            <div class="empty-state">Select a player from the list</div>
+                            <div class="empty-guide">
+                                <div class="empty-guide-title">Player Actions</div>
+                                <div class="empty-guide-desc">Select a player from the list on the left to see their details and available admin actions.</div>
+                                <div class="empty-guide-steps">
+                                    <div class="empty-guide-step"><span class="empty-guide-num">1</span> Click a player name in the Online list</div>
+                                    <div class="empty-guide-step"><span class="empty-guide-num">2</span> Give EXP, kick, ban, freeze, or teleport</div>
+                                    <div class="empty-guide-step"><span class="empty-guide-num">3</span> With MOD source: see HP, inventory, party pals</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -185,8 +194,13 @@
         </div>
 
         <!-- ── Teleport Tab ─────────────────────────────────────────── -->
-        <div class="tab-panel" id="tab-teleport">
-            <div class="split">
+        <div class="tab-panel" id="tab-teleport" style="flex-direction:column">
+            <div id="hint-teleport" class="hint-banner hint-warn" style="margin:10px 10px 0;flex-shrink:0">
+                <span class="hint-icon">!</span>
+                <span class="hint-text"><strong>Admin must be online in-game</strong> for teleport commands to work. Your character needs to exist in the world. Teleport moves the admin first, then brings the target player.</span>
+                <button class="hint-dismiss" onclick="dismissHint('teleport')">&times;</button>
+            </div>
+            <div class="split" style="flex:1;min-height:0">
                 <div class="col">
                     <div class="panel full-h">
                         <div class="panel-head">
@@ -218,7 +232,7 @@
                                     <option value="base">Base</option>
                                     <option value="resource">Resource</option>
                                 </select>
-                                <button class="btn btn-accent" onclick="saveCurrentPosition()">Save Here</button>
+                                <button class="btn btn-accent" onclick="saveCurrentPosition()" title="Save admin's current in-game position as a named waypoint">Save Here</button>
                             </div>
                         </div>
                     </div>
@@ -231,22 +245,22 @@
                             <label>Y<input type="number" id="goto-y" class="input mono" value="0" step="100"></label>
                             <label>Z<input type="number" id="goto-z" class="input mono" value="0" step="100"></label>
                         </div>
-                        <button class="btn btn-accent full-w" onclick="gotoManualCoords()">Go To Coordinates</button>
+                        <button class="btn btn-accent full-w" onclick="gotoManualCoords()" title="Teleport admin to the specified X/Y/Z coordinates">Go To Coordinates</button>
                     </div>
                     <div class="panel">
                         <div class="panel-head"><h3>SEND PLAYER TO WAYPOINT</h3></div>
                         <label>Player<select id="tp-player" class="input"></select></label>
                         <label>Destination<select id="tp-waypoint" class="input"></select></label>
-                        <button class="btn btn-accent full-w" onclick="teleportPlayerToWaypoint()">Teleport Player</button>
+                        <button class="btn btn-accent full-w" onclick="teleportPlayerToWaypoint()" title="Admin goes to waypoint first, then brings the player to that location">Teleport Player</button>
                     </div>
                     <div class="panel">
                         <div class="panel-head"><h3>QUICK TELEPORT</h3></div>
                         <label>Target Player<select id="qt-player" class="input"></select></label>
                         <div class="btn-grid">
-                            <button class="btn" onclick="bringSelectedPlayer()">Bring Player to Me</button>
-                            <button class="btn" onclick="gotoSelectedPlayer()">Go to Player</button>
-                            <button class="btn btn-warn" onclick="bringAllPlayers()">Bring All to Me</button>
-                            <button class="btn" onclick="adminUnstuck()">Unstuck (Self)</button>
+                            <button class="btn" onclick="bringSelectedPlayer()" title="Teleport the selected player to the admin's current position">Bring Player to Me</button>
+                            <button class="btn" onclick="gotoSelectedPlayer()" title="Teleport admin to the selected player's position (needs REST API coordinates)">Go to Player</button>
+                            <button class="btn btn-warn" onclick="bringAllPlayers()" title="Teleport ALL online players to admin's position — use with caution!">Bring All to Me</button>
+                            <button class="btn" onclick="adminUnstuck()" title="Reset admin position if stuck in terrain or falling through the world">Unstuck (Self)</button>
                         </div>
                     </div>
                 </div>
@@ -286,18 +300,18 @@
                     <div class="panel">
                         <div class="panel-head"><h3>ADMIN POWERS</h3></div>
                         <div class="btn-grid">
-                            <button class="btn btn-success" onclick="flyToggle(true)">Enable Fly</button>
-                            <button class="btn" onclick="flyToggle(false)">Disable Fly</button>
-                            <button class="btn" onclick="toggleSpectate()">Toggle Spectate</button>
-                            <button class="btn" onclick="adminUnstuck()">Unstuck</button>
+                            <button class="btn btn-success" onclick="flyToggle(true)" title="Enable flight mode for the admin character">Enable Fly</button>
+                            <button class="btn" onclick="flyToggle(false)" title="Disable flight mode and return to normal movement">Disable Fly</button>
+                            <button class="btn" onclick="toggleSpectate()" title="Toggle spectator camera — detach from your character to observe freely">Toggle Spectate</button>
+                            <button class="btn" onclick="adminUnstuck()" title="Reset admin position if stuck in terrain">Unstuck</button>
                         </div>
                     </div>
                     <div class="panel">
                         <div class="panel-head"><h3>PLAYER TOOLS</h3></div>
                         <label>Target Player<select id="world-target" class="input"></select></label>
                         <div class="btn-grid">
-                            <button class="btn btn-warn" onclick="bringAllPlayers()">Bring All</button>
-                            <button class="btn" onclick="getPlayerPos()">Get Position</button>
+                            <button class="btn btn-warn" onclick="bringAllPlayers()" title="Teleport ALL online players to admin's position — use with caution!">Bring All</button>
+                            <button class="btn" onclick="getPlayerPos()" title="Get player's coordinates — result appears in the in-game chat, not here">Get Position</button>
                         </div>
                     </div>
                 </div>
@@ -318,13 +332,181 @@
             </div>
         </div>
         <div id="rcon-bar">
-            <button class="btn btn-sm" onclick="rconCmd('Save')">Save</button>
-            <button class="btn btn-sm" onclick="rconCmd('Info')">Info</button>
-            <button class="btn btn-sm" onclick="rconBroadcast()">Broadcast</button>
+            <button class="btn btn-sm" onclick="rconCmd('Save')" title="Force-save the world state to disc immediately">Save</button>
+            <button class="btn btn-sm" onclick="rconCmd('Info')" title="Show server version and connection info">Info</button>
+            <button class="btn btn-sm" onclick="rconBroadcast()" title="Send a message to all online players via RCON">Broadcast</button>
             <div class="rcon-input-group">
                 <input type="text" id="rcon-input" class="input" placeholder="RCON command...">
                 <button class="btn btn-sm" onclick="rconCustom()">Send</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Welcome Overlay (first visit) -->
+    <div id="welcome-overlay" class="welcome-backdrop" style="display:none">
+        <div class="welcome-card">
+            <div class="welcome-header">
+                <div class="welcome-logo">LIVE EDITOR</div>
+                <div class="welcome-sub">Palworld Server Admin Dashboard</div>
+            </div>
+
+            <div class="welcome-tabs-grid">
+                <div class="welcome-tab-card">
+                    <div class="welcome-tab-name">PLAYERS</div>
+                    <div class="welcome-tab-desc">View online players, give EXP, kick/ban/freeze players, see live stats when mod is active.</div>
+                </div>
+                <div class="welcome-tab-card">
+                    <div class="welcome-tab-name">ITEMS</div>
+                    <div class="welcome-tab-desc">Browse all game items with filters and sorting. Select an item and give it to any online player.</div>
+                </div>
+                <div class="welcome-tab-card">
+                    <div class="welcome-tab-name">PALS</div>
+                    <div class="welcome-tab-desc">Browse all pals by element, work type, rarity, and more. Spawn any pal for a player.</div>
+                </div>
+                <div class="welcome-tab-card">
+                    <div class="welcome-tab-name">TELEPORT</div>
+                    <div class="welcome-tab-desc">Save waypoints, teleport to coordinates, bring players to you, or send them to locations.</div>
+                </div>
+                <div class="welcome-tab-card">
+                    <div class="welcome-tab-name">WORLD</div>
+                    <div class="welcome-tab-desc">Control time of day, broadcast messages, toggle fly/spectate mode, admin utilities.</div>
+                </div>
+            </div>
+
+            <div class="welcome-prereqs">
+                <div class="welcome-prereqs-title">BEFORE YOU START</div>
+                <ul>
+                    <li>The Palworld server must be running with the UE4SS mod enabled (status bar shows <strong>MOD ON</strong>).</li>
+                    <li>For teleport commands, the admin must be logged into the game &mdash; your character needs to exist in the world.</li>
+                    <li>Give/Spawn commands require an online target player &mdash; select one from the Players tab first.</li>
+                    <li>The RCON bar at the bottom sends raw server commands &mdash; use <strong>Save</strong> to save the world, <strong>Info</strong> for server info.</li>
+                </ul>
+            </div>
+
+            <div class="welcome-footer">
+                <label><input type="checkbox" id="welcome-dismiss-check"> Don't show this again</label>
+                <button class="btn btn-accent" onclick="dismissWelcome()">Get Started</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Panel (slide-out drawer) -->
+    <div id="help-backdrop" class="help-backdrop" style="display:none" onclick="toggleHelp()"></div>
+    <div id="help-panel" class="help-panel" style="display:none">
+        <div class="help-header">
+            <span class="help-title">REFERENCE GUIDE</span>
+            <button class="help-close" onclick="toggleHelp()">ESC</button>
+        </div>
+        <div class="help-body">
+            <div class="help-section">
+                <div class="help-section-title">Status Bar Badges</div>
+                <div class="help-badge-row">
+                    <span class="help-badge hb-on">MOD ON</span>
+                    <span class="help-badge-desc">UE4SS mod is loaded &mdash; all commands available</span>
+                </div>
+                <div class="help-badge-row">
+                    <span class="help-badge hb-off">MOD OFF</span>
+                    <span class="help-badge-desc">Mod disabled &mdash; give/spawn/teleport won't work</span>
+                </div>
+                <div class="help-badge-row">
+                    <span class="help-badge hb-mod">MOD</span>
+                    <span class="help-badge-desc">Player data from UE4SS Lua mod (richest: HP, inventory, pals)</span>
+                </div>
+                <div class="help-badge-row">
+                    <span class="help-badge hb-rest">REST</span>
+                    <span class="help-badge-desc">Player data from REST API (ping, location, level)</span>
+                </div>
+                <div class="help-badge-row">
+                    <span class="help-badge hb-rcon">RCON</span>
+                    <span class="help-badge-desc">Player data from RCON only (name and basic info)</span>
+                </div>
+            </div>
+
+            <div class="help-section">
+                <div class="help-section-title">Tab Guide</div>
+                <div class="help-row">
+                    <span class="help-key" style="color:var(--blue)">Players</span>
+                    <span class="help-val">View online players, select one to see actions: give EXP, kick, ban, freeze, teleport. When MOD source is active, shows HP bars and party info.</span>
+                </div>
+                <div class="help-row">
+                    <span class="help-key" style="color:var(--amber)">Items</span>
+                    <span class="help-val">Browse all game items. Use filters and search to find items. Select an item, choose a target player, set quantity, and click "Give Item".</span>
+                </div>
+                <div class="help-row">
+                    <span class="help-key" style="color:var(--green)">Pals</span>
+                    <span class="help-val">Browse all pals with element, work, rarity, and partner skill filters. Select a pal, choose target player and level, click "Spawn Pal".</span>
+                </div>
+                <div class="help-row">
+                    <span class="help-key" style="color:var(--cyan)">Teleport</span>
+                    <span class="help-val">Manage waypoints, go to coordinates, bring/send players. <strong>Admin must be in-game</strong> for teleport to work.</span>
+                </div>
+                <div class="help-row">
+                    <span class="help-key" style="color:var(--purple)">World</span>
+                    <span class="help-val">Set time of day, broadcast messages to all players, toggle fly and spectate mode.</span>
+                </div>
+            </div>
+
+            <div class="help-section">
+                <div class="help-section-title">Prerequisites</div>
+                <div class="help-row">
+                    <span class="help-key">Server</span>
+                    <span class="help-val">PalServer.exe must be running. Status bar shows green dot when active.</span>
+                </div>
+                <div class="help-row">
+                    <span class="help-key">UE4SS Mod</span>
+                    <span class="help-val">Required for give/spawn/teleport commands. Status bar shows "MOD ON" when loaded.</span>
+                </div>
+                <div class="help-row">
+                    <span class="help-key">Admin In-Game</span>
+                    <span class="help-val">Teleport commands require the admin to be logged into the game with a character in the world.</span>
+                </div>
+                <div class="help-row">
+                    <span class="help-key">Target Player</span>
+                    <span class="help-val">Give Item and Spawn Pal need a player online. Select one from the Players tab first.</span>
+                </div>
+            </div>
+
+            <div class="help-section">
+                <div class="help-section-title">RCON Quick Reference</div>
+                <div class="help-row">
+                    <span class="help-key">Save</span>
+                    <span class="help-val">Force-save the world to disc</span>
+                </div>
+                <div class="help-row">
+                    <span class="help-key">Info</span>
+                    <span class="help-val">Show server version and status</span>
+                </div>
+                <div class="help-row">
+                    <span class="help-key">ShowPlayers</span>
+                    <span class="help-val">List all connected players</span>
+                </div>
+                <div class="help-row">
+                    <span class="help-key">Broadcast msg</span>
+                    <span class="help-val">Send message to all players (use _ for spaces)</span>
+                </div>
+                <div class="help-row">
+                    <span class="help-key">Shutdown sec msg</span>
+                    <span class="help-val">Graceful shutdown with countdown and message</span>
+                </div>
+            </div>
+
+            <div class="help-section">
+                <div class="help-section-title">Keyboard Shortcuts</div>
+                <div class="help-row">
+                    <span class="help-key"><span class="help-kbd">?</span></span>
+                    <span class="help-val">Toggle this help panel</span>
+                </div>
+                <div class="help-row">
+                    <span class="help-key"><span class="help-kbd">Esc</span></span>
+                    <span class="help-val">Close help panel or welcome overlay</span>
+                </div>
+                <div class="help-row">
+                    <span class="help-key"><span class="help-kbd">Enter</span></span>
+                    <span class="help-val">Send RCON command (when RCON input focused)</span>
+                </div>
+            </div>
+
+            <a href="/explorer.html" class="help-chip-btn">Open UObject Explorer &rarr;</a>
         </div>
     </div>
 

@@ -329,7 +329,14 @@ function renderPlayerActions() {
     const p = state.players.find(pl => pl.name === state.selectedPlayer);
 
     if (!p) {
-        el.innerHTML = '<div class="empty-state">Select a player from the list</div>';
+        el.innerHTML = '<div class="empty-guide">' +
+            '<div class="empty-guide-title">Player Actions</div>' +
+            '<div class="empty-guide-desc">Select a player from the list on the left to see their details and available admin actions.</div>' +
+            '<div class="empty-guide-steps">' +
+                '<div class="empty-guide-step"><span class="empty-guide-num">1</span> Click a player name in the Online list</div>' +
+                '<div class="empty-guide-step"><span class="empty-guide-num">2</span> Give EXP, kick, ban, freeze, or teleport</div>' +
+                '<div class="empty-guide-step"><span class="empty-guide-num">3</span> With MOD source: see HP, inventory, party pals</div>' +
+            '</div></div>';
         return;
     }
 
@@ -836,7 +843,14 @@ function renderItemDetail() {
     const el = document.getElementById('item-detail');
     const item = state.selectedItem;
     if (!item) {
-        el.innerHTML = '<div class="empty-state">Select an item from the list</div>';
+        el.innerHTML = '<div class="empty-guide">' +
+            '<div class="empty-guide-title">Item Details</div>' +
+            '<div class="empty-guide-desc">Select an item from the list to see its full stats, effects, and description.</div>' +
+            '<div class="empty-guide-steps">' +
+                '<div class="empty-guide-step"><span class="empty-guide-num">1</span> Use search or category filters to find an item</div>' +
+                '<div class="empty-guide-step"><span class="empty-guide-num">2</span> Click the item to see details here</div>' +
+                '<div class="empty-guide-step"><span class="empty-guide-num">3</span> Choose a target player and quantity below to give it</div>' +
+            '</div></div>';
         return;
     }
 
@@ -1178,7 +1192,14 @@ function renderPalDetail() {
     const el = document.getElementById('pal-detail');
     const pal = state.selectedPal;
     if (!pal) {
-        el.innerHTML = '<div class="empty-state">Select a pal from the list</div>';
+        el.innerHTML = '<div class="empty-guide">' +
+            '<div class="empty-guide-title">Pal Details</div>' +
+            '<div class="empty-guide-desc">Select a pal from the list to see stats, skills, work suitability, and partner skill info.</div>' +
+            '<div class="empty-guide-steps">' +
+                '<div class="empty-guide-step"><span class="empty-guide-num">1</span> Use element, work, or rarity filters to find a pal</div>' +
+                '<div class="empty-guide-step"><span class="empty-guide-num">2</span> Click the pal to see full details here</div>' +
+                '<div class="empty-guide-step"><span class="empty-guide-num">3</span> Choose a target player and level below to spawn it</div>' +
+            '</div></div>';
         return;
     }
 
@@ -1716,6 +1737,87 @@ function toggleLog() {
     document.getElementById('log-toggle').classList.toggle('collapsed', !state.logExpanded);
 }
 
+/* ── Welcome Overlay ───────────────────────────────────────────────────────── */
+
+function showWelcome() {
+    const overlay = document.getElementById('welcome-overlay');
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+    overlay.classList.remove('hiding');
+    overlay.querySelector('.welcome-card').classList.remove('hiding');
+}
+
+function dismissWelcome() {
+    const overlay = document.getElementById('welcome-overlay');
+    if (!overlay) return;
+
+    const dontShow = document.getElementById('welcome-dismiss-check');
+    if (dontShow && dontShow.checked) {
+        localStorage.setItem('le-welcome-dismissed', '1');
+    }
+
+    overlay.classList.add('hiding');
+    overlay.querySelector('.welcome-card').classList.add('hiding');
+    setTimeout(() => {
+        if (overlay.classList.contains('hiding')) {
+            overlay.style.display = 'none';
+        }
+    }, 260);
+}
+
+function checkWelcome() {
+    if (!localStorage.getItem('le-welcome-dismissed')) {
+        showWelcome();
+    }
+}
+
+/* ── Help Panel ────────────────────────────────────────────────────────────── */
+
+let helpOpen = false;
+
+function toggleHelp() {
+    helpOpen = !helpOpen;
+    const backdrop = document.getElementById('help-backdrop');
+    const panel = document.getElementById('help-panel');
+
+    if (helpOpen) {
+        backdrop.style.display = 'block';
+        panel.style.display = 'flex';
+        void backdrop.offsetHeight;
+        backdrop.classList.remove('hiding');
+        panel.classList.remove('hiding');
+    } else {
+        backdrop.classList.add('hiding');
+        panel.classList.add('hiding');
+        setTimeout(() => {
+            if (!helpOpen) {
+                backdrop.style.display = 'none';
+                panel.style.display = 'none';
+            }
+        }, 220);
+    }
+}
+
+/* ── Hint Banners ──────────────────────────────────────────────────────────── */
+
+function dismissHint(id) {
+    const el = document.getElementById('hint-' + id);
+    if (el) {
+        el.style.display = 'none';
+        localStorage.setItem('le-hint-' + id, '1');
+    }
+}
+
+function initHints() {
+    // Hide previously dismissed hints
+    document.querySelectorAll('.hint-banner').forEach(el => {
+        const id = el.id.startsWith('hint-') ? el.id.slice(5) : el.id;
+        if (localStorage.getItem('le-hint-' + id)) {
+            el.style.display = 'none';
+        }
+    });
+}
+
 /* ── Utility ───────────────────────────────────────────────────────────────── */
 
 function esc(str) {
@@ -1823,6 +1925,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             });
+        }
+    });
+
+    // Welcome overlay + hints
+    checkWelcome();
+    initHints();
+
+    // Global keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        // Don't trigger shortcuts when typing in inputs
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+
+        if (e.key === '?') {
+            e.preventDefault();
+            toggleHelp();
+        }
+        if (e.key === 'Escape') {
+            if (helpOpen) toggleHelp();
+            const welcome = document.getElementById('welcome-overlay');
+            if (welcome && welcome.style.display !== 'none') dismissWelcome();
         }
     });
 

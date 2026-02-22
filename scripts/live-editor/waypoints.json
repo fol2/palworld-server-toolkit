@@ -19,6 +19,16 @@
                           "x":  -346395.375,
                           "name":  "Eugnel Home",
                           "y":  262812.28125
+                      },
+                      {
+                          "id":  "wp_1771787898873",
+                          "category":  "custom",
+                          "preset":  false,
+                          "created":  "2026-02-22",
+                          "z":  0,
+                          "x":  -345241.625,
+                          "name":  "death place",
+                          "y":  191997.09375
                       }
                   ]
 }

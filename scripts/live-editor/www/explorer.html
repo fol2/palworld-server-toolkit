@@ -270,6 +270,216 @@
         .status-err { color: var(--red); }
         .status-loading { color: var(--amber); }
 
+        /* ── Explorer Guide ──────────────────────────────────────────── */
+        .explorer-guide {
+            padding: 32px 40px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .explorer-guide h2 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+        .explorer-guide p {
+            font-size: 12px;
+            color: var(--text-sec);
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+        .explorer-guide-section {
+            margin-bottom: 16px;
+        }
+        .explorer-guide-section h3 {
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 1.2px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+        .explorer-legend {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+        .explorer-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 8px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 11px;
+        }
+        .explorer-legend-swatch {
+            width: 8px;
+            height: 8px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+        .explorer-legend-label {
+            color: var(--text-sec);
+            font-size: 10px;
+        }
+        .explorer-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .explorer-step {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            padding: 8px 12px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+        .explorer-step-num {
+            flex-shrink: 0;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: var(--accent-dim);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            font-size: 11px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Fira Code', monospace;
+        }
+        .explorer-step-text {
+            font-size: 12px;
+            color: var(--text-sec);
+            line-height: 1.5;
+        }
+        .explorer-step-text strong {
+            color: var(--text);
+            font-weight: 500;
+        }
+        .explorer-preset-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .explorer-preset-item {
+            display: flex;
+            gap: 10px;
+            align-items: baseline;
+            padding: 5px 10px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 11px;
+        }
+        .explorer-preset-item code {
+            font-family: 'Fira Code', monospace;
+            font-size: 11px;
+            color: var(--cyan);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .explorer-preset-item span {
+            color: var(--text-sec);
+            font-size: 10px;
+        }
+        .explorer-tips {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .explorer-tips li {
+            font-size: 11px;
+            color: var(--text-sec);
+            line-height: 1.5;
+            list-style: none;
+            padding-left: 14px;
+            position: relative;
+        }
+        .explorer-tips li::before {
+            content: '\2022';
+            color: var(--text-muted);
+            position: absolute;
+            left: 0;
+        }
+        .explorer-hint {
+            padding: 6px 12px;
+            background: var(--accent-dim);
+            border: 1px solid var(--accent);
+            border-radius: 4px;
+            font-size: 11px;
+            color: var(--text-sec);
+            margin: 8px 12px 4px 12px;
+        }
+        .explorer-hint strong {
+            color: var(--cyan);
+            font-weight: 500;
+        }
+
+        /* ── Probe Status Panel ──────────────────────────────────── */
+        .probe-panel {
+            padding: 10px 20px;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            display: none;
+        }
+        .probe-panel.visible { display: block; }
+        .probe-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .probe-header h3 {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: var(--text-sec);
+            text-transform: uppercase;
+        }
+        .probe-badge {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            padding: 2px 8px;
+            border-radius: 3px;
+        }
+        .probe-badge.ok { background: rgba(52, 211, 153, 0.15); color: var(--green); }
+        .probe-badge.pending { background: rgba(251, 191, 36, 0.15); color: var(--amber); }
+        .probe-badge.fail { background: rgba(248, 113, 113, 0.15); color: var(--red); }
+        .probe-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 4px;
+        }
+        .probe-item {
+            display: flex;
+            gap: 8px;
+            align-items: baseline;
+            padding: 3px 8px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            font-size: 10px;
+            font-family: 'Fira Code', monospace;
+        }
+        .probe-key { color: var(--text-muted); white-space: nowrap; }
+        .probe-val { color: var(--green); }
+        .probe-val.missing { color: var(--red); font-style: italic; }
+        .probe-toggle {
+            font-size: 10px;
+            color: var(--text-muted);
+            cursor: pointer;
+            margin-left: auto;
+        }
+        .probe-toggle:hover { color: var(--text); }
+
         .slider-row {
             display: flex;
             align-items: center;
@@ -340,12 +550,25 @@
         </div>
         <div class="ctrl-group">
             <label>&nbsp;</label>
-            <button id="btn-dump" class="btn btn-accent" onclick="doDump()">Dump Properties</button>
+            <div style="display:flex;gap:6px">
+                <button id="btn-dump" class="btn btn-accent" onclick="doDump()">Dump Properties</button>
+                <button id="btn-probe" class="btn btn-sm" onclick="doProbe(true)" title="Run auto-discovery to find property names for player stats, HP, inventory, etc." style="align-self:center">Probe</button>
+                <button class="btn btn-sm" onclick="showExplorerGuide()" title="Show getting-started guide" style="align-self:center">Guide</button>
+            </div>
         </div>
     </div>
 
     <div class="breadcrumb" id="breadcrumb">
         <span class="bc-current">Ready</span>
+    </div>
+
+    <div class="probe-panel" id="probe-panel">
+        <div class="probe-header">
+            <h3>Auto-Discovery</h3>
+            <span id="probe-badge" class="probe-badge pending">NOT RUN</span>
+            <span class="probe-toggle" id="probe-toggle" onclick="toggleProbeDetails()">Show details</span>
+        </div>
+        <div class="probe-grid" id="probe-grid" style="display:none"></div>
     </div>
 
     <div class="results-info" id="results-info" style="display:none">
@@ -354,14 +577,7 @@
         <span id="info-props"></span>
     </div>
 
-    <div class="results" id="results">
-        <div class="empty-state">
-            Enter a class name and click "Dump Properties" to explore UObject properties.<br>
-            <span style="color:var(--text-sec);font-size:11px;margin-top:8px;display:inline-block">
-                Tip: Click on ObjectProperty or StructProperty values to drill into them.
-            </span>
-        </div>
-    </div>
+    <div class="results" id="results"></div>
 
     <div class="status-bar">
         <span id="status-text">Ready</span>

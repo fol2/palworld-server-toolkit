@@ -7,5 +7,6 @@
   "live_editor_port": 8213,
   "server_port": 8211,
   "public_ip": "",
-  "server_dir": "server"
+  "server_dir": "server",
+  "curseforge_api_key": ""
 }
