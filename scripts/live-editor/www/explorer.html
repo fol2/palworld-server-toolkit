@@ -132,9 +132,80 @@
         .btn-accent:hover { background: #3A7AE4; }
         .btn-accent:disabled { opacity: 0.4; cursor: not-allowed; }
         .btn-sm { padding: 4px 10px; font-size: 11px; }
+        .btn-warn { background: #92400E; border-color: #B45309; color: #FDE68A; }
+        .btn-warn:hover { background: #78350F; }
 
         .preset-btns { display: flex; gap: 4px; }
         .preset-btns .btn { padding: 4px 8px; font-size: 10px; }
+
+        /* Mode toggle */
+        .mode-toggle {
+            display: flex;
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .mode-toggle .mode-btn {
+            background: var(--bg);
+            color: var(--text-sec);
+            border: none;
+            padding: 6px 14px;
+            font-size: 11px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            transition: background 0.15s, color 0.15s;
+        }
+        .mode-toggle .mode-btn + .mode-btn { border-left: 1px solid var(--border-light); }
+        .mode-toggle .mode-btn.active { background: var(--accent); color: #fff; }
+        .mode-toggle .mode-btn:hover:not(.active) { background: var(--bg-hover); color: var(--text); }
+
+        /* Filter row (for functions mode) */
+        .filter-row {
+            display: none;
+            gap: 10px;
+            padding: 8px 20px;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+            align-items: center;
+        }
+        .filter-row.visible { display: flex; }
+        .filter-row label {
+            font-size: 9px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        /* Function table extras */
+        .fn-tag {
+            display: inline-block;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-weight: 600;
+            font-family: 'Fira Code', monospace;
+            letter-spacing: 0.3px;
+        }
+        .fn-tag.native { background: rgba(75,139,245,0.15); color: var(--blue); }
+        .fn-tag.event { background: rgba(167,139,250,0.15); color: var(--purple); }
+        .fn-tag.callable { background: rgba(52,211,153,0.15); color: var(--green); }
+        .fn-tag.net { background: rgba(251,191,36,0.15); color: var(--amber); }
+        .fn-tag.static { background: rgba(248,113,113,0.15); color: var(--red); }
+        .fn-tag.final { background: rgba(224,224,236,0.1); color: var(--text-sec); }
+
+        .fn-params {
+            font-family: 'Fira Code', monospace;
+            font-size: 10px;
+            color: var(--text-sec);
+        }
+        .fn-params .param-name { color: var(--text); }
+        .fn-params .param-type { color: var(--cyan); }
+        .fn-params .param-out { color: var(--amber); font-style: italic; }
+        .fn-return { color: var(--green); font-family: 'Fira Code', monospace; font-size: 10px; }
 
         /* Breadcrumb */
         .breadcrumb {
@@ -521,6 +592,13 @@
 
     <div class="controls">
         <div class="ctrl-group">
+            <label>Mode</label>
+            <div class="mode-toggle">
+                <button class="mode-btn active" id="mode-props" onclick="setMode('properties')">Properties</button>
+                <button class="mode-btn" id="mode-funcs" onclick="setMode('functions')">Functions</button>
+            </div>
+        </div>
+        <div class="ctrl-group">
             <label>Class Name</label>
             <input type="text" id="class-name" class="input mono" value="PalPlayerState" style="width:220px">
         </div>
@@ -554,8 +632,14 @@
                 <button id="btn-dump" class="btn btn-accent" onclick="doDump()">Dump Properties</button>
                 <button id="btn-probe" class="btn btn-sm" onclick="doProbe(true)" title="Run auto-discovery to find property names for player stats, HP, inventory, etc." style="align-self:center">Probe</button>
                 <button class="btn btn-sm" onclick="showExplorerGuide()" title="Show getting-started guide" style="align-self:center">Guide</button>
+                <button id="btn-gensdk" class="btn btn-sm btn-warn" onclick="doGenerateSDK()" title="Generate CXXHeaderDump (one-shot, writes to ue4ss/CXXHeaderDump/)" style="align-self:center;display:none">Gen SDK</button>
             </div>
         </div>
+    </div>
+
+    <div class="filter-row" id="filter-row">
+        <label>Filter</label>
+        <input type="text" id="fn-filter" class="input mono" placeholder="e.g. BroadCast, Give, Chat" style="width:240px">
     </div>
 
     <div class="breadcrumb" id="breadcrumb">

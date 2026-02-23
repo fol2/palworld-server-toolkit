@@ -25,6 +25,10 @@ const state = {
     palFilterSize: '',
     palFilterPS: '',
     palSortAsc: true,
+    playerDetailCache: {},
+    discoveryStatus: 'unknown',
+    discoveryFound: null,
+    discoveryTotal: null,
 };
 
 /* Category metadata */
@@ -160,6 +164,9 @@ const PS_TYPE_ORDER = ['fly','ride','swim','combat','shield','heal','ranch','car
 /* Stat maximums for bar normalisation (will be computed from palDb) */
 let palStatMax = { hp: 100, attack: 100, defense: 100, stamina: 100 };
 
+/* Track which party pal editor is expanded (-1 = none) */
+let expandedPalIdx = -1;
+
 /* ── API helpers ───────────────────────────────────────────────────────────── */
 
 async function api(path, opts) {
@@ -254,6 +261,11 @@ async function refreshPlayers() {
     state.players = data.players || [];
     state.playerSource = data.source || 'rcon';
 
+    // Capture discovery status from response
+    if (data.discovery !== undefined) state.discoveryStatus = data.discovery;
+    if (data.discovery_found !== undefined) state.discoveryFound = data.discovery_found;
+    if (data.discovery_total !== undefined) state.discoveryTotal = data.discovery_total;
+
     if (!state.selectedPlayer && state.players.length > 0) {
         state.selectedPlayer = state.players[0].name;
     }
@@ -262,6 +274,7 @@ async function refreshPlayers() {
     renderPlayerActions();
     updateAllTargetDropdowns();
     updateSourceBadge();
+    updateDiscoveryIndicator();
 
     document.getElementById('online-count').textContent = state.players.length;
 }
@@ -302,11 +315,11 @@ function renderPlayers() {
 
         // HP bar (when Lua data available)
         let hpHtml = '';
-        if (isLua && p.hp != null && p.max_hp != null && p.max_hp > 0) {
-            const pct = Math.min((p.hp / p.max_hp) * 100, 100).toFixed(0);
+        if (isLua && p.hp_rate != null) {
+            const pct = Math.min(p.hp_rate * 100, 100).toFixed(0);
             hpHtml = '<div class="player-hp-bar">' +
                 '<div class="player-hp-bg"><div class="player-hp-fill" style="width:' + pct + '%"></div></div>' +
-                '<span class="player-hp-text">' + p.hp + '/' + p.max_hp + '</span>' +
+                '<span class="player-hp-text">' + pct + '%</span>' +
             '</div>';
         }
 
@@ -328,6 +341,11 @@ function renderPlayerActions() {
     const el = document.getElementById('player-actions-content');
     const p = state.players.find(pl => pl.name === state.selectedPlayer);
 
+    // Skip full rebuild when pal manager is open — prevents destroying the panel
+    if (palManagerOpen && p && document.getElementById('pm-overlay')) {
+        return;
+    }
+
     if (!p) {
         el.innerHTML = '<div class="empty-guide">' +
             '<div class="empty-guide-title">Player Actions</div>' +
@@ -335,7 +353,7 @@ function renderPlayerActions() {
             '<div class="empty-guide-steps">' +
                 '<div class="empty-guide-step"><span class="empty-guide-num">1</span> Click a player name in the Online list</div>' +
                 '<div class="empty-guide-step"><span class="empty-guide-num">2</span> Give EXP, kick, ban, freeze, or teleport</div>' +
-                '<div class="empty-guide-step"><span class="empty-guide-num">3</span> With MOD source: see HP, inventory, party pals</div>' +
+                '<div class="empty-guide-step"><span class="empty-guide-num">3</span> With MOD source: see HP, ATK, DEF, SHOT, Craft Speed</div>' +
             '</div></div>';
         return;
     }
@@ -352,22 +370,67 @@ function renderPlayerActions() {
         statsHtml = '<div class="pa-stats">' + levelText + '  |  Ping: ' + pingText + '  |  Pos: ' + locText + '</div>';
     }
 
-    // HP bar for Lua data (from live list) — will be enhanced with detail data
+    // Merge live list data with cached detail data for flicker-free rendering
+    const cached = state.playerDetailCache[p.name] || {};
+    const hpRate = p.hp_rate != null ? p.hp_rate : cached.hp_rate;
+    const atk = p.attack != null ? p.attack : cached.attack;
+    const def = p.defense != null ? p.defense : cached.defense;
+    const shot = cached.shot_attack;
+    const craft = cached.craft_speed;
+    const food = p.fullstomach != null ? p.fullstomach : cached.fullstomach;
+    const foodMax = p.max_fullstomach != null ? p.max_fullstomach : cached.max_fullstomach;
+    const san = p.sanity != null ? p.sanity : cached.sanity;
+    const sanMax = p.max_sanity != null ? p.max_sanity : cached.max_sanity;
+
+    // HP bar (immediate from live + cache, no async gap)
     let hpBarHtml = '';
-    if (isLua && p.hp != null && p.max_hp != null && p.max_hp > 0) {
-        const pct = Math.min((p.hp / p.max_hp) * 100, 100).toFixed(0);
+    if (isLua && hpRate != null) {
+        const pct = Math.min(hpRate * 100, 100).toFixed(0);
         hpBarHtml = '<div class="pa-hp-bar">' +
             '<span class="pa-stat-label">HP</span>' +
             '<div class="pa-hp-bg"><div class="pa-hp-fill" style="width:' + pct + '%"></div></div>' +
-            '<span class="pa-hp-text">' + p.hp + ' / ' + p.max_hp + '</span>' +
+            '<span class="pa-hp-text">' + pct + '%</span>' +
         '</div>';
     }
+    // Fullness bar
+    if (isLua && food != null && foodMax != null && foodMax > 0) {
+        const foodPct = Math.min((food / foodMax) * 100, 100).toFixed(0);
+        hpBarHtml += '<div class="pa-hp-bar pa-food-bar">' +
+            '<span class="pa-stat-label">FOOD</span>' +
+            '<div class="pa-hp-bg"><div class="pa-hp-fill pa-food-fill" style="width:' + foodPct + '%"></div></div>' +
+            '<span class="pa-hp-text">' + Math.round(food) + ' / ' + Math.round(foodMax) + '</span>' +
+        '</div>';
+    }
+    // Sanity bar
+    if (isLua && san != null && sanMax != null && sanMax > 0) {
+        const sanPct = Math.min((san / sanMax) * 100, 100).toFixed(0);
+        hpBarHtml += '<div class="pa-hp-bar pa-san-bar">' +
+            '<span class="pa-stat-label">SAN</span>' +
+            '<div class="pa-hp-bg"><div class="pa-hp-fill pa-san-fill" style="width:' + sanPct + '%"></div></div>' +
+            '<span class="pa-hp-text">' + Math.round(san) + ' / ' + Math.round(sanMax) + '</span>' +
+        '</div>';
+    }
+    // Stats row (immediate from live + cache)
+    let statsRowHtml = '';
+    if (isLua && (atk != null || def != null || shot != null || craft != null)) {
+        statsRowHtml = '<div id="pa-stats-anchor"><div class="pa-stats-row">';
+        if (atk != null) statsRowHtml += '<div class="pa-stat"><span class="pa-stat-label">ATK</span> <span class="pa-stat-value">' + atk + '</span></div>';
+        if (shot != null) statsRowHtml += '<div class="pa-stat"><span class="pa-stat-label">SHOT</span> <span class="pa-stat-value">' + shot + '</span></div>';
+        if (def != null) statsRowHtml += '<div class="pa-stat"><span class="pa-stat-label">DEF</span> <span class="pa-stat-value">' + def + '</span></div>';
+        if (craft != null) statsRowHtml += '<div class="pa-stat"><span class="pa-stat-label">CRAFT</span> <span class="pa-stat-value">' + craft + '</span></div>';
+        statsRowHtml += '</div></div>';
+    } else {
+        statsRowHtml = isLua ? '<div id="pa-stats-anchor"></div>' : '';
+    }
 
-    // Inventory + party pals containers — populated via async detail fetch
+    // Inventory + party pals + pal manager containers
     let detailSectionsHtml =
         '<div id="pa-detail-sections">' +
             '<div id="pa-inventory-section"></div>' +
             '<div id="pa-party-section"></div>' +
+            '<div class="action-group">' +
+                '<button class="btn btn-accent btn-sm" onclick="togglePalManager()" style="width:100%">Manage All Pals (Party + Box)</button>' +
+            '</div>' +
         '</div>';
 
     el.innerHTML =
@@ -375,6 +438,7 @@ function renderPlayerActions() {
             '<div class="pa-name">' + esc(p.name) + '</div>' +
             statsHtml +
             hpBarHtml +
+            statsRowHtml +
         '</div>' +
 
         '<div class="action-group">' +
@@ -419,103 +483,682 @@ function renderPlayerActions() {
             '</div>' +
         '</div>' +
 
+        '<div class="action-group">' +
+            '<div class="action-group-label">Admin Stats <span class="badge">Experimental</span></div>' +
+            '<div class="action-row" style="margin-bottom:6px">' +
+                '<button class="btn btn-accent btn-sm" onclick="editPlayerStat(\'full_power\')">MAX ALL</button>' +
+            '</div>' +
+            '<div class="stat-editor-grid">' +
+                '<div class="stat-editor-row"><span>HP</span><input type="number" id="stat-hp" class="input mono" value="10000" min="1" style="width:80px"><button class="btn btn-xs" onclick="editPlayerStat(\'set_hp\',\'stat-hp\')">Set</button></div>' +
+                '<div class="stat-editor-row"><span>SP</span><input type="number" id="stat-sp" class="input mono" value="10000" min="1" style="width:80px"><button class="btn btn-xs" onclick="editPlayerStat(\'set_sp\',\'stat-sp\')">Set</button></div>' +
+                '<div class="stat-editor-row"><span>Money</span><input type="number" id="stat-money" class="input mono" value="1000000" min="1" style="width:80px"><button class="btn btn-xs" onclick="editPlayerStat(\'add_money\',\'stat-money\')">Add</button></div>' +
+                '<div class="stat-editor-row"><span>Tech Pts</span><input type="number" id="stat-tech" class="input mono" value="100" min="1" style="width:80px"><button class="btn btn-xs" onclick="editPlayerStat(\'add_tech_points\',\'stat-tech\')">Add</button></div>' +
+                '<div class="stat-editor-row"><span>Boss Tech</span><input type="number" id="stat-btech" class="input mono" value="100" min="1" style="width:80px"><button class="btn btn-xs" onclick="editPlayerStat(\'add_boss_tech\',\'stat-btech\')">Add</button></div>' +
+                '<div class="stat-editor-row"><span>Inv Size</span><input type="number" id="stat-inv" class="input mono" value="100" min="1" style="width:80px"><button class="btn btn-xs" onclick="editPlayerStat(\'set_inventory_size\',\'stat-inv\')">Set</button></div>' +
+            '</div>' +
+        '</div>' +
+
         detailSectionsHtml;
 
-    // Async: fetch player detail for inventory + party pals
-    if (isLua && p.name) {
+    // Async: fetch player detail for inventory + party pals (try regardless of source)
+    if (p.name) {
         fetchPlayerDetail(p.name);
     }
 }
 
 /* Fetch detailed player data (inventory, party pals) from Lua mod */
 async function fetchPlayerDetail(playerName) {
-    const data = await apiGet('/api/player/' + encodeURIComponent(playerName));
-    if (!data || data.success === false) return;
+    const enc = encodeURIComponent(playerName);
+    const [detailResp, palsResp, invResp] = await Promise.all([
+        apiGet('/api/player/' + enc),
+        apiGet('/api/player/' + enc + '/pals'),
+        apiGet('/api/player/' + enc + '/inventory'),
+    ]);
     // Guard: player may have changed during the await
     if (state.selectedPlayer !== playerName) return;
 
-    // Render HP bar with detail data (if we got better data)
-    if (data.hp != null && data.max_hp != null) {
-        const pct = data.max_hp > 0 ? Math.min((data.hp / data.max_hp) * 100, 100).toFixed(0) : 0;
-        const hpEl = document.querySelector('.pa-hp-bar');
+    // data may be empty if detail endpoint fails; null-checks handle it downstream
+    const data = (detailResp && detailResp.success !== false) ? detailResp : {};
+
+    // Cache detail data for flicker-free re-renders
+    state.playerDetailCache[playerName] = data;
+
+    // Update bars in-place (detail may have fresher data than live list)
+    if (data.hp_rate != null) {
+        const pct = Math.min(data.hp_rate * 100, 100).toFixed(0);
+        const hpEl = document.querySelector('.pa-hp-bar:not(.pa-food-bar):not(.pa-san-bar)');
         if (hpEl) {
-            hpEl.innerHTML =
-                '<span class="pa-stat-label">HP</span>' +
-                '<div class="pa-hp-bg"><div class="pa-hp-fill" style="width:' + pct + '%"></div></div>' +
-                '<span class="pa-hp-text">' + data.hp + ' / ' + data.max_hp + '</span>';
+            hpEl.querySelector('.pa-hp-fill').style.width = pct + '%';
+            hpEl.querySelector('.pa-hp-text').textContent = pct + '%';
+        }
+    }
+    if (data.fullstomach != null && data.max_fullstomach != null && data.max_fullstomach > 0) {
+        const foodPct = Math.min((data.fullstomach / data.max_fullstomach) * 100, 100).toFixed(0);
+        const foodEl = document.querySelector('.pa-food-bar');
+        if (foodEl) {
+            foodEl.querySelector('.pa-hp-fill').style.width = foodPct + '%';
+            foodEl.querySelector('.pa-hp-text').textContent = Math.round(data.fullstomach) + ' / ' + Math.round(data.max_fullstomach);
+        }
+    }
+    if (data.sanity != null && data.max_sanity != null && data.max_sanity > 0) {
+        const sanPct = Math.min((data.sanity / data.max_sanity) * 100, 100).toFixed(0);
+        const sanEl = document.querySelector('.pa-san-bar');
+        if (sanEl) {
+            sanEl.querySelector('.pa-hp-fill').style.width = sanPct + '%';
+            sanEl.querySelector('.pa-hp-text').textContent = Math.round(data.sanity) + ' / ' + Math.round(data.max_sanity);
         }
     }
 
-    // Stats row
-    if (data.attack != null || data.defense != null) {
-        const hpBar = document.querySelector('.pa-hp-bar');
-        if (hpBar) {
+    // Update stats row in-place
+    const anchor = document.getElementById('pa-stats-anchor');
+    if (anchor) {
+        const hasStats = data.attack != null || data.defense != null || data.shot_attack != null || data.craft_speed != null;
+        if (hasStats) {
             let statsRow = '<div class="pa-stats-row">';
-            if (data.attack != null) {
-                statsRow += '<div class="pa-stat"><span class="pa-stat-label">ATK</span> <span class="pa-stat-value">' + data.attack + '</span></div>';
-            }
-            if (data.defense != null) {
-                statsRow += '<div class="pa-stat"><span class="pa-stat-label">DEF</span> <span class="pa-stat-value">' + data.defense + '</span></div>';
-            }
+            if (data.attack != null) statsRow += '<div class="pa-stat"><span class="pa-stat-label">ATK</span> <span class="pa-stat-value">' + data.attack + '</span></div>';
+            if (data.shot_attack != null) statsRow += '<div class="pa-stat"><span class="pa-stat-label">SHOT</span> <span class="pa-stat-value">' + data.shot_attack + '</span></div>';
+            if (data.defense != null) statsRow += '<div class="pa-stat"><span class="pa-stat-label">DEF</span> <span class="pa-stat-value">' + data.defense + '</span></div>';
+            if (data.craft_speed != null) statsRow += '<div class="pa-stat"><span class="pa-stat-label">CRAFT</span> <span class="pa-stat-value">' + data.craft_speed + '</span></div>';
             statsRow += '</div>';
-            hpBar.insertAdjacentHTML('afterend', statsRow);
+            anchor.innerHTML = statsRow;
         }
-    }
 
-    // Inventory section
-    const invEl = document.getElementById('pa-inventory-section');
-    if (invEl && data.inventory && data.inventory.length > 0) {
-        let invHtml = '<div class="pa-inventory">' +
-            '<div class="action-group-label">Inventory (' + data.inventory.length + ')</div>' +
-            '<div class="pa-inv-list">';
-        for (const item of data.inventory) {
-            // Try to find item name from loaded items data
-            const itemData = state.items.find(i => i.id === item.id);
-            const itemName = itemData ? itemData.name : item.id;
-            const itemIcon = itemData ? itemData.icon : null;
-            invHtml += '<div class="pa-inv-item">' +
-                iconImg(itemIcon, 20) +
-                '<span class="pa-inv-name">' + esc(itemName) + '</span>' +
-                '<span class="pa-inv-qty">x' + (item.qty || 1) + '</span>' +
-            '</div>';
-        }
-        invHtml += '</div></div>';
-        invEl.innerHTML = invHtml;
-    }
-
-    // Party pals section
-    const partyEl = document.getElementById('pa-party-section');
-    if (partyEl && data.party_pals && data.party_pals.length > 0) {
-        let partyHtml = '<div class="pa-party">' +
-            '<div class="action-group-label">Party Pals (' + data.party_pals.length + ')</div>' +
-            '<div class="pa-party-grid">';
-        for (const pal of data.party_pals) {
-            // Try to find pal data from palDb
-            const palData = state.palDb[pal.id];
-            const palName = pal.nickname || (palData ? palData.name : pal.id) || pal.id;
-            const palIcon = palData ? palData.icon : null;
-            const levelStr = pal.level != null ? 'Lv' + pal.level : '';
-
-            let hpBarStr = '';
-            if (pal.hp != null && pal.max_hp != null && pal.max_hp > 0) {
-                const pct = Math.min((pal.hp / pal.max_hp) * 100, 100).toFixed(0);
-                hpBarStr = '<div class="pa-pal-hp-bg"><div class="pa-pal-hp-fill" style="width:' + pct + '%"></div></div>';
+        // Discovery note
+        if (!anchor.querySelector('.pa-discovery-note')) {
+            const hasAnyData = data.hp_rate != null || data.attack != null || data.defense != null;
+            if (state.discoveryStatus === 'pending') {
+                anchor.insertAdjacentHTML('beforeend',
+                    '<div class="pa-discovery-note">Auto-discovery in progress — more data will appear once property scanning completes.</div>');
+            } else if (state.discoveryStatus === 'ok' && !hasAnyData) {
+                anchor.insertAdjacentHTML('beforeend',
+                    '<div class="pa-discovery-note">Discovery complete but no player data extracted. Check discovery-log.json for raw property names.</div>');
             }
+        }
+    }
 
-            partyHtml += '<div class="pa-pal-card">' +
-                iconImg(palIcon, 28) +
-                '<div class="pa-pal-info">' +
-                    '<div class="pa-pal-name">' + esc(palName) + '</div>' +
-                    '<div class="pa-pal-meta">' +
-                        (pal.hp != null ? pal.hp + '/' + (pal.max_hp || '?') + ' HP' : '') +
+    // Inventory section (from dedicated endpoint, fallback to detail data)
+    const invItems = (invResp && invResp.success !== false && invResp.items) ? invResp.items : (data.inventory || []);
+    const invNote = (invResp && invResp.success === false) ? invResp.message :
+                    (invResp && invResp.debug) ? invResp.debug : null;
+    console.log('[PalEditor] inventory resp:', JSON.stringify(invResp), '→ items:', invItems.length);
+    renderPlayerInventory(invItems, invNote);
+
+    // Party pals section (from dedicated endpoint with full stats, fallback to detail)
+    const palsNote = (palsResp && palsResp.note) ? palsResp.note :
+                     (palsResp && palsResp.debug) ? palsResp.debug :
+                     (palsResp && palsResp.success === false) ? palsResp.message : null;
+    const palsList = (palsResp && palsResp.success !== false && palsResp.pals) ? palsResp.pals : (data.party_pals || []);
+    console.log('[PalEditor] pals resp:', JSON.stringify(palsResp), '→ pals:', palsList.length);
+    state.currentPalData = palsList;
+    renderPlayerPartyPals(palsList, palsNote);
+}
+
+function renderPlayerInventory(items, note) {
+    var el = document.getElementById('pa-inventory-section');
+    if (!el) return;
+    if (!items || items.length === 0) {
+        el.innerHTML = '<div class="action-group"><div class="action-group-label">Inventory</div>' +
+            '<div class="empty-state" style="padding:8px;font-size:12px;opacity:.6">' +
+            (note ? esc(note) : 'No inventory data available') + '</div></div>';
+        return;
+    }
+    var html = '<div class="pa-inventory">' +
+        '<div class="action-group-label">Inventory (' + items.length + ')</div>' +
+        '<div class="pa-inv-list">';
+    for (var ii = 0; ii < items.length; ii++) {
+        var item = items[ii];
+        var itemData = state.items.find(function(i) { return i.id === item.id; });
+        var itemName = itemData ? itemData.name : item.id;
+        var itemIcon = itemData ? itemData.icon : null;
+        html += '<div class="pa-inv-item">' +
+            iconImg(itemIcon, 20) +
+            '<span class="pa-inv-name">' + esc(itemName) + '</span>' +
+            '<span class="pa-inv-qty">x' + (item.qty || item.count || 1) + '</span>' +
+        '</div>';
+    }
+    html += '</div></div>';
+    el.innerHTML = html;
+}
+
+function renderPlayerPartyPals(pals, note) {
+    var partyEl = document.getElementById('pa-party-section');
+    if (!partyEl) return;
+    if (!pals || pals.length === 0) {
+        partyEl.innerHTML = '<div class="action-group"><div class="action-group-label">Party Pals</div>' +
+            '<div class="empty-state" style="padding:8px;font-size:12px;opacity:.6">' +
+            (note ? esc(note) : 'No party pals found — player may need to be in-game with pals in party') + '</div></div>';
+        return;
+    }
+
+    var html = '<div class="pa-party">' +
+        '<div class="action-group-label">Party Pals (' + pals.length + ')</div>' +
+        '<div class="pa-party-grid">';
+
+    pals.forEach(function(pal, idx) {
+        var palData = state.palDb[pal.character_id];
+        var displayName = pal.nickname || (palData ? palData.name : null) || pal.character_id || '???';
+        var palIcon = palData ? palData.icon : null;
+        var levelStr = pal.level != null ? 'Lv' + pal.level : '';
+        var isExpanded = expandedPalIdx === idx;
+
+        // Rank stars (condense rank 0-4)
+        var rankHtml = '';
+        if (pal.rank != null && pal.rank > 0) {
+            rankHtml = '<span class="pal-rank-stars">';
+            for (var ri = 0; ri < pal.rank; ri++) rankHtml += '<span class="pal-rank-star">\u2605</span>';
+            rankHtml += '</span>';
+        }
+        // Dead / gender indicators
+        var deadBadge = pal.is_dead ? '<span class="pal-dead-badge">DEAD</span>' : '';
+        var genderIcon = pal.gender === 'Male' ? '<span class="pal-gender male">\u2642</span>' :
+                         pal.gender === 'Female' ? '<span class="pal-gender female">\u2640</span>' : '';
+
+        // Compact stats
+        var statsHtml = '';
+        if (pal.melee_attack != null || pal.defense != null) {
+            statsHtml = '<div class="pal-card-stats">';
+            if (pal.max_hp != null) statsHtml += '<span>HP:' + Math.floor(pal.max_hp / 1000) + '</span>';
+            if (pal.melee_attack != null) statsHtml += '<span>ATK:' + pal.melee_attack + '</span>';
+            if (pal.defense != null) statsHtml += '<span>DEF:' + pal.defense + '</span>';
+            if (pal.craft_speed != null) statsHtml += '<span>SPD:' + pal.craft_speed + '</span>';
+            statsHtml += '</div>';
+        }
+
+        // Passive badges
+        var passivesHtml = '';
+        if (pal.passives && pal.passives.length > 0) {
+            passivesHtml = '<div class="pal-card-passives">';
+            for (var pi = 0; pi < pal.passives.length; pi++) {
+                var ps = state.passiveSkills[pal.passives[pi]];
+                passivesHtml += '<span class="pal-passive-badge" title="' + esc(pal.passives[pi]) + '">' + esc(ps ? ps.name : pal.passives[pi]) + '</span>';
+            }
+            passivesHtml += '</div>';
+        }
+
+        html += '<div class="pa-pal-card-v2' + (isExpanded ? ' expanded' : '') + (pal.is_dead ? ' dead' : '') + '">' +
+            '<div class="pal-card-header" onclick="togglePalEditor(' + idx + ')">' +
+                iconImg(palIcon, 32) +
+                '<div class="pal-card-info">' +
+                    '<div class="pal-card-top">' +
+                        '<span class="pal-card-name">' + esc(displayName) + '</span>' +
+                        genderIcon + rankHtml + deadBadge +
+                    '</div>' +
+                    statsHtml +
+                    passivesHtml +
+                '</div>' +
+                '<span class="pal-card-level">' + levelStr + '</span>' +
+                '<span class="pal-card-expand">' + (isExpanded ? '\u25BE' : '\u25B8') + '</span>' +
+            '</div>';
+
+        if (isExpanded) {
+            html += renderPalEditorPanel(pal, idx);
+        }
+        html += '</div>';
+    });
+
+    html += '</div></div>';
+    partyEl.innerHTML = html;
+}
+
+function renderPalEditorPanel(pal, palIdx) {
+    var html = '<div class="pal-editor-panel">';
+
+    // ── Heal ──
+    html += '<div class="pal-editor-section">' +
+        '<div class="pal-editor-label">Health</div>' +
+        '<div class="action-row">' +
+            '<button class="btn btn-success btn-sm" onclick="palAction(' + palIdx + ',\'heal\')">Full Heal</button>' +
+            '<select class="input" id="pal-health-' + palIdx + '" style="width:120px">' +
+                '<option value="0"' + (pal.physical_health === 0 ? ' selected' : '') + '>Healthy</option>' +
+                '<option value="1"' + (pal.physical_health === 1 ? ' selected' : '') + '>Injured</option>' +
+                '<option value="2"' + (pal.physical_health === 2 ? ' selected' : '') + '>Depressed</option>' +
+            '</select>' +
+            '<button class="btn btn-sm" onclick="palAction(' + palIdx + ',\'set_physical_health\',{value:+document.getElementById(\'pal-health-' + palIdx + '\').value})">Set</button>' +
+        '</div></div>';
+
+    // ── Passives ──
+    html += '<div class="pal-editor-section">' +
+        '<div class="pal-editor-label">Passives</div>';
+    if (pal.passives && pal.passives.length > 0) {
+        html += '<div class="pal-editor-tags">';
+        for (var i = 0; i < pal.passives.length; i++) {
+            var ps = state.passiveSkills[pal.passives[i]];
+            html += '<span class="pal-editor-tag">' + esc(ps ? ps.name : pal.passives[i]) +
+                '<button class="tag-remove" onclick="palAction(' + palIdx + ',\'remove_passive\',{skill_id:\'' + esc(pal.passives[i]) + '\'})">x</button></span>';
+        }
+        html += '</div>';
+    }
+    html += '<div class="action-row">' +
+        '<select class="input" id="pal-add-passive-' + palIdx + '" style="flex:1;max-width:200px">';
+    var pKeys = Object.keys(state.passiveSkills).sort(function(a, b) {
+        return (state.passiveSkills[a].name || a).localeCompare(state.passiveSkills[b].name || b);
+    });
+    for (var pk = 0; pk < pKeys.length; pk++) {
+        if (pal.passives && pal.passives.indexOf(pKeys[pk]) >= 0) continue;
+        html += '<option value="' + esc(pKeys[pk]) + '">' + esc(state.passiveSkills[pKeys[pk]].name || pKeys[pk]) + '</option>';
+    }
+    html += '</select>' +
+        '<button class="btn btn-sm" onclick="palAction(' + palIdx + ',\'add_passive\',{skill_id:document.getElementById(\'pal-add-passive-' + palIdx + '\').value})">Add</button>' +
+    '</div></div>';
+
+    // ── Moves ──
+    html += '<div class="pal-editor-section">' +
+        '<div class="pal-editor-label">Equipped Moves</div>';
+    if (pal.equip_waza && pal.equip_waza.length > 0) {
+        html += '<div class="pal-editor-tags">';
+        for (var mi = 0; mi < pal.equip_waza.length; mi++) {
+            var sk = state.activeSkills[pal.equip_waza[mi]];
+            html += '<span class="pal-editor-tag">' + esc(sk ? sk.name : pal.equip_waza[mi]) +
+                '<button class="tag-remove" onclick="palAction(' + palIdx + ',\'remove_move\',{waza_id:\'' + esc(pal.equip_waza[mi]) + '\'})">x</button></span>';
+        }
+        html += '</div>';
+    }
+    var availMoves = (pal.mastered_waza && pal.mastered_waza.length > 0) ? pal.mastered_waza : Object.keys(state.activeSkills);
+    html += '<div class="action-row">' +
+        '<select class="input" id="pal-add-move-' + palIdx + '" style="flex:1;max-width:200px">';
+    for (var mj = 0; mj < availMoves.length; mj++) {
+        if (pal.equip_waza && pal.equip_waza.indexOf(availMoves[mj]) >= 0) continue;
+        var msk = state.activeSkills[availMoves[mj]];
+        html += '<option value="' + esc(availMoves[mj]) + '">' + esc(msk ? msk.name : availMoves[mj]) + '</option>';
+    }
+    html += '</select>' +
+        '<button class="btn btn-sm" onclick="palAction(' + palIdx + ',\'add_move\',{waza_id:document.getElementById(\'pal-add-move-' + palIdx + '\').value})">Add</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="palAction(' + palIdx + ',\'clear_moves\')">Clear All</button>' +
+    '</div></div>';
+
+    // ── Stat Points ──
+    html += '<div class="pal-editor-section">' +
+        '<div class="pal-editor-label">Stat Points <span class="dim">(Unused: ' + (pal.unused_points || 0) + ')</span></div>' +
+        '<div class="stat-editor-grid">' +
+            '<div class="stat-editor-row"><span>HP</span><input type="number" id="pal-pts-hp-' + palIdx + '" class="input mono" value="' + (pal.hp_points || 0) + '" min="0" style="width:60px"><button class="btn btn-xs" onclick="palAction(' + palIdx + ',\'set_status_point\',{stat_name:\'HP\',value:+document.getElementById(\'pal-pts-hp-' + palIdx + '\').value})">Set</button></div>' +
+            '<div class="stat-editor-row"><span>ATK</span><input type="number" id="pal-pts-atk-' + palIdx + '" class="input mono" value="' + (pal.atk_points || 0) + '" min="0" style="width:60px"><button class="btn btn-xs" onclick="palAction(' + palIdx + ',\'set_status_point\',{stat_name:\'Attack\',value:+document.getElementById(\'pal-pts-atk-' + palIdx + '\').value})">Set</button></div>' +
+            '<div class="stat-editor-row"><span>DEF</span><input type="number" id="pal-pts-def-' + palIdx + '" class="input mono" value="' + (pal.def_points || 0) + '" min="0" style="width:60px"><button class="btn btn-xs" onclick="palAction(' + palIdx + ',\'set_status_point\',{stat_name:\'Defense\',value:+document.getElementById(\'pal-pts-def-' + palIdx + '\').value})">Set</button></div>' +
+        '</div></div>';
+
+    // ── Friendship ──
+    html += '<div class="pal-editor-section">' +
+        '<div class="pal-editor-label">Friendship <span class="dim">(Rank ' + (pal.friendship_rank || 0) + ' | ' + (pal.friendship_point || 0) + ' pts)</span></div>' +
+        '<div class="action-row">' +
+            '<input type="number" id="pal-friend-' + palIdx + '" class="input mono" value="100" min="1" style="width:80px">' +
+            '<button class="btn btn-sm" onclick="palAction(' + palIdx + ',\'add_friendship\',{value:+document.getElementById(\'pal-friend-' + palIdx + '\').value||100})">Add Points</button>' +
+        '</div></div>';
+
+    // ── Ranks (experimental) ──
+    html += '<div class="pal-editor-section">' +
+        '<div class="pal-editor-label">Ranks <span class="badge">Experimental</span></div>' +
+        '<div class="pal-editor-hint">Uses CheatManager — may only affect first party pal</div>' +
+        '<div class="stat-editor-grid">' +
+            '<div class="stat-editor-row"><span>Condense</span><input type="number" id="pal-rank-' + palIdx + '" class="input mono" value="' + (pal.rank || 0) + '" min="0" max="4" style="width:50px"><button class="btn btn-xs" onclick="palAction(' + palIdx + ',\'set_rank\',{value:+document.getElementById(\'pal-rank-' + palIdx + '\').value})">Set</button></div>' +
+            '<div class="stat-editor-row"><span>HP Rank</span><input type="number" id="pal-hprank-' + palIdx + '" class="input mono" value="' + (pal.hp_rank || 0) + '" min="0" style="width:50px"><button class="btn btn-xs" onclick="palAction(' + palIdx + ',\'set_hp_rank\',{value:+document.getElementById(\'pal-hprank-' + palIdx + '\').value})">Set</button></div>' +
+            '<div class="stat-editor-row"><span>ATK Rank</span><input type="number" id="pal-atkrank-' + palIdx + '" class="input mono" value="' + (pal.attack_rank || 0) + '" min="0" style="width:50px"><button class="btn btn-xs" onclick="palAction(' + palIdx + ',\'set_atk_rank\',{value:+document.getElementById(\'pal-atkrank-' + palIdx + '\').value})">Set</button></div>' +
+            '<div class="stat-editor-row"><span>DEF Rank</span><input type="number" id="pal-defrank-' + palIdx + '" class="input mono" value="' + (pal.defence_rank || 0) + '" min="0" style="width:50px"><button class="btn btn-xs" onclick="palAction(' + palIdx + ',\'set_def_rank\',{value:+document.getElementById(\'pal-defrank-' + palIdx + '\').value})">Set</button></div>' +
+            '<div class="stat-editor-row"><span>WS Rank</span><input type="number" id="pal-wsrank-' + palIdx + '" class="input mono" value="0" min="0" style="width:50px"><button class="btn btn-xs" onclick="palAction(' + palIdx + ',\'set_ws_rank\',{value:+document.getElementById(\'pal-wsrank-' + palIdx + '\').value})">Set</button></div>' +
+        '</div></div>';
+
+    html += '</div>';
+    return html;
+}
+
+function togglePalEditor(idx) {
+    expandedPalIdx = expandedPalIdx === idx ? -1 : idx;
+    if (state.currentPalData) {
+        renderPlayerPartyPals(state.currentPalData);
+    }
+}
+
+async function palAction(palIdx, action, extraParams) {
+    var playerName = state.selectedPlayer;
+    if (!playerName) { addLog('No player selected', 'err'); return; }
+
+    var body = { action: action, pal_index: palIdx };
+    if (extraParams) {
+        for (var k in extraParams) { body[k] = extraParams[k]; }
+    }
+
+    addLog('Pal: ' + action + ' on pal #' + palIdx, 'info');
+    var result = await apiPost('/api/player/' + encodeURIComponent(playerName) + '/pal/edit', body);
+    if (result && result.success) {
+        addLog(result.message || 'OK', 'ok');
+    } else {
+        addLog('Failed: ' + (result ? result.message : 'No response'), 'err');
+    }
+    refreshPalData(playerName);
+}
+
+async function refreshPalData(playerName) {
+    var palsResp = await apiGet('/api/player/' + encodeURIComponent(playerName) + '/pals');
+    if (state.selectedPlayer !== playerName) return;
+    var pals = (palsResp && palsResp.success !== false && palsResp.pals) ? palsResp.pals : [];
+    state.currentPalData = pals;
+    renderPlayerPartyPals(pals);
+}
+
+/* ── Pal Manager (fullscreen modal) ────────────────────────────────────────── */
+
+let palManagerOpen = false;
+let palManagerData = { party: [], box: [], box_pages: 0, box_page: 0 };
+let palManagerBoxPage = 0;
+let palManagerSelectedPal = null;
+
+function togglePalManager() {
+    palManagerOpen = !palManagerOpen;
+    var overlay = document.getElementById('pm-overlay');
+    if (!overlay) {
+        // Create overlay once, append to body
+        overlay = document.createElement('div');
+        overlay.id = 'pm-overlay';
+        overlay.className = 'pm-overlay';
+        overlay.innerHTML =
+            '<div class="pm-modal">' +
+                '<div class="pm-modal-header">' +
+                    '<h3>PAL MANAGER</h3>' +
+                    '<span class="pm-player-name" id="pm-player-label"></span>' +
+                    '<span class="spacer"></span>' +
+                    '<button class="btn btn-sm" onclick="togglePalManager()">Close</button>' +
+                '</div>' +
+                '<div class="pm-modal-body">' +
+                    '<div class="pm-list-pane" id="pm-list-pane">' +
+                        '<div class="empty-state">Loading...</div>' +
+                    '</div>' +
+                    '<div class="pm-detail-pane" id="pm-detail-pane">' +
+                        '<div class="empty-state">Select a pal</div>' +
                     '</div>' +
                 '</div>' +
-                '<span class="pa-pal-level">' + levelStr + '</span>' +
-                hpBarStr +
             '</div>';
+        document.body.appendChild(overlay);
+    }
+    if (palManagerOpen) {
+        overlay.classList.add('open');
+        document.body.classList.add('pm-no-scroll');
+        document.getElementById('pm-player-label').textContent = state.selectedPlayer || '';
+        if (state.selectedPlayer) loadPalManager(state.selectedPlayer);
+    } else {
+        overlay.classList.remove('open');
+        document.body.classList.remove('pm-no-scroll');
+    }
+}
+
+async function loadPalManager(playerName, page) {
+    if (page == null) page = palManagerBoxPage;
+    var enc = encodeURIComponent(playerName);
+    var resp = await apiGet('/api/player/' + enc + '/all-pals?page=' + page + '&page_size=30');
+    if (!resp || state.selectedPlayer !== playerName) return;
+
+    palManagerData = {
+        party: resp.party || [],
+        box: resp.box || [],
+        box_pages: resp.box_pages || 0,
+        box_page: resp.box_page || 0,
+        box_count: resp.box_count || 0,
+        party_debug: resp.party_debug || '',
+    };
+    palManagerBoxPage = palManagerData.box_page;
+    renderPalManagerList();
+    renderPalManagerDetailPane();
+}
+
+function renderPalManagerList() {
+    var pane = document.getElementById('pm-list-pane');
+    if (!pane) return;
+
+    // Party section
+    var html = '<div class="pm-section">' +
+        '<div class="pm-section-label">Party (' + palManagerData.party.length + ')</div>' +
+        '<div class="pm-pal-grid">';
+    palManagerData.party.forEach(function(pal) { html += renderPalManagerCard(pal); });
+    if (palManagerData.party.length === 0) {
+        var dbg = palManagerData.party_debug || '';
+        html += '<div class="empty-state" style="font-size:11px">No party pals<br><span class="mono dim" style="font-size:9px">' + esc(dbg) + '</span></div>';
+    }
+    html += '</div></div>';
+
+    // Box section
+    html += '<div class="pm-section">' +
+        '<div class="pm-section-label">Pal Box' +
+            (palManagerData.box_pages > 0 ? ' — Page ' + (palManagerData.box_page + 1) + '/' + palManagerData.box_pages : '') +
+        '</div>';
+    if (palManagerData.box_pages > 1) {
+        html += '<div class="pm-pagination">';
+        for (var p = 0; p < palManagerData.box_pages; p++) {
+            html += '<button class="btn btn-xs' + (p === palManagerData.box_page ? ' btn-accent' : '') + '" ' +
+                'onclick="palManagerGoPage(' + p + ')">' + (p + 1) + '</button>';
         }
-        partyHtml += '</div></div>';
-        partyEl.innerHTML = partyHtml;
+        html += '</div>';
+    }
+    html += '<div class="pm-pal-grid">';
+    palManagerData.box.forEach(function(pal) { html += renderPalManagerCard(pal); });
+    if (palManagerData.box.length === 0 && palManagerData.box_pages > 0) html += '<div class="empty-state">Empty page</div>';
+    else if (palManagerData.box_pages === 0) html += '<div class="empty-state">Pal box not accessible</div>';
+    html += '</div></div>';
+
+    pane.innerHTML = html;
+}
+
+function renderPalManagerCard(pal) {
+    var palData = state.palDb[pal.character_id];
+    var displayName = pal.nickname || (palData ? palData.name : null) || pal.character_id || '???';
+    var palIcon = palData ? palData.icon : null;
+    var levelStr = pal.level != null ? 'Lv' + pal.level : '';
+    var isSelected = palManagerSelectedPal &&
+        palManagerSelectedPal.source === pal.source &&
+        ((pal.source === 'party' && palManagerSelectedPal.index === pal.index) ||
+         (pal.source === 'box' && palManagerSelectedPal.box_page === pal.box_page && palManagerSelectedPal.slot_index === pal.slot_index));
+
+    var rankHtml = '';
+    if (pal.rank != null && pal.rank > 0) {
+        rankHtml = '<span class="pal-rank-stars">';
+        for (var ri = 0; ri < pal.rank; ri++) rankHtml += '<span class="pal-rank-star">\u2605</span>';
+        rankHtml += '</span>';
+    }
+    var deadBadge = pal.is_dead ? '<span class="pal-dead-badge">DEAD</span>' : '';
+
+    var elemHtml = '';
+    if (palData && palData.elements) {
+        palData.elements.forEach(function(e) {
+            var color = ELEM_COLORS[e.id] || '#888';
+            elemHtml += '<span class="pm-elem-badge" style="background:' + color + '22;color:' + color + '">' + (e.id || '') + '</span>';
+        });
+    }
+
+    var clickData = pal.source === 'box'
+        ? "pmSelectPal('box',-1," + pal.box_page + "," + pal.slot_index + ")"
+        : "pmSelectPal('party'," + pal.index + ",0,0)";
+
+    return '<div class="pm-card' + (isSelected ? ' selected' : '') + (pal.is_dead ? ' dead' : '') + '" onclick="' + clickData + '">' +
+        iconImg(palIcon, 28) +
+        '<div class="pm-card-info">' +
+            '<div class="pm-card-top">' +
+                '<span class="pm-card-name">' + esc(displayName) + '</span>' +
+                rankHtml + deadBadge +
+            '</div>' +
+            '<div class="pm-card-meta">' + elemHtml + '</div>' +
+        '</div>' +
+        '<span class="pm-card-level">' + levelStr + '</span>' +
+    '</div>';
+}
+
+function pmSelectPal(source, index, boxPage, slotIndex) {
+    var pal = null;
+    if (source === 'party') {
+        pal = palManagerData.party.find(function(p) { return p.index === index; });
+    } else {
+        pal = palManagerData.box.find(function(p) { return p.box_page === boxPage && p.slot_index === slotIndex; });
+    }
+    if (!pal) return;
+    palManagerSelectedPal = { source: source, index: index, box_page: boxPage, slot_index: slotIndex, pal: pal };
+    // Update list selection highlight without full rebuild
+    document.querySelectorAll('.pm-card').forEach(function(c) { c.classList.remove('selected'); });
+    event.currentTarget.classList.add('selected');
+    renderPalManagerDetailPane();
+}
+
+function renderPalManagerDetailPane() {
+    var pane = document.getElementById('pm-detail-pane');
+    if (!pane) return;
+    if (!palManagerSelectedPal || !palManagerSelectedPal.pal) {
+        pane.innerHTML = '<div class="empty-state">Select a pal to view and edit</div>';
+        return;
+    }
+    pane.innerHTML = renderPalManagerDetail();
+    pane.scrollTop = 0;
+}
+
+function renderPalManagerDetail() {
+    var sel = palManagerSelectedPal;
+    var pal = sel.pal;
+    var palData = state.palDb[pal.character_id];
+    var displayName = pal.nickname || (palData ? palData.name : null) || pal.character_id || '???';
+    var speciesName = palData ? palData.name : pal.character_id || '???';
+    var palIcon = palData ? palData.icon : null;
+    var srcLabel = sel.source === 'box' ? 'Box p' + (sel.box_page + 1) + ' #' + sel.slot_index : 'Party #' + (sel.index + 1);
+
+    var editPrefix = sel.source === 'box'
+        ? "pmEditPal('box'," + sel.box_page + "," + sel.slot_index
+        : "pmEditPal('party',0,0";
+
+    var html = '<div class="pm-detail-header">' +
+        iconImg(palIcon, 48) +
+        '<div class="pm-detail-info">' +
+            '<div class="pm-detail-name">' + esc(displayName) + '</div>' +
+            '<div class="pm-detail-species">' + esc(speciesName) + ' | ' + srcLabel + '</div>' +
+        '</div>' +
+        '<button class="btn btn-success btn-sm" onclick="' + editPrefix + ',\'heal\')" style="margin-left:auto">Heal</button>' +
+    '</div>';
+
+    // Rename
+    html += '<div class="pm-edit-section">' +
+        '<div class="pm-edit-label">Nickname</div>' +
+        '<div class="action-row">' +
+            '<input type="text" id="pm-rename" class="input" value="' + esc(pal.nickname || '') + '" placeholder="' + esc(speciesName) + '" style="flex:1">' +
+            '<button class="btn btn-sm" onclick="' + editPrefix + ',\'rename\',{nickname:document.getElementById(\'pm-rename\').value})">Set</button>' +
+        '</div></div>';
+
+    // Core stats
+    html += '<div class="pm-edit-section"><div class="pm-edit-label">Stats</div><div class="pm-stats-grid">';
+    if (pal.level != null) html += '<div class="pm-stat"><span>Level</span><span class="mono">' + pal.level + '</span></div>';
+    if (pal.max_hp != null) html += '<div class="pm-stat"><span>HP</span><span class="mono">' + Math.floor(pal.max_hp / 1000) + '</span></div>';
+    if (pal.melee_attack != null) html += '<div class="pm-stat"><span>ATK</span><span class="mono">' + pal.melee_attack + '</span></div>';
+    if (pal.defense != null) html += '<div class="pm-stat"><span>DEF</span><span class="mono">' + pal.defense + '</span></div>';
+    if (pal.craft_speed != null) html += '<div class="pm-stat"><span>SPD</span><span class="mono">' + pal.craft_speed + '</span></div>';
+    html += '</div></div>';
+
+    // Stat Points
+    html += '<div class="pm-edit-section">' +
+        '<div class="pm-edit-label">Stat Points <span class="dim">(Unused: ' + (pal.unused_points || 0) + ')</span></div>' +
+        '<div class="stat-editor-grid">' +
+            '<div class="stat-editor-row"><span>HP</span><input type="number" id="pm-pts-hp" class="input mono" value="' + (pal.hp_points || 0) + '" min="0" style="width:60px"><button class="btn btn-xs" onclick="' + editPrefix + ',\'set_status_point\',{stat_name:\'HP\',value:+document.getElementById(\'pm-pts-hp\').value})">Set</button></div>' +
+            '<div class="stat-editor-row"><span>ATK</span><input type="number" id="pm-pts-atk" class="input mono" value="' + (pal.atk_points || 0) + '" min="0" style="width:60px"><button class="btn btn-xs" onclick="' + editPrefix + ',\'set_status_point\',{stat_name:\'Attack\',value:+document.getElementById(\'pm-pts-atk\').value})">Set</button></div>' +
+            '<div class="stat-editor-row"><span>DEF</span><input type="number" id="pm-pts-def" class="input mono" value="' + (pal.def_points || 0) + '" min="0" style="width:60px"><button class="btn btn-xs" onclick="' + editPrefix + ',\'set_status_point\',{stat_name:\'Defense\',value:+document.getElementById(\'pm-pts-def\').value})">Set</button></div>' +
+        '</div></div>';
+
+    // Passives
+    html += '<div class="pm-edit-section"><div class="pm-edit-label">Passives</div>';
+    if (pal.passives && pal.passives.length > 0) {
+        html += '<div class="pal-editor-tags">';
+        for (var i = 0; i < pal.passives.length; i++) {
+            var ps = state.passiveSkills[pal.passives[i]];
+            html += '<span class="pal-editor-tag">' + esc(ps ? ps.name : pal.passives[i]) +
+                '<button class="tag-remove" onclick="' + editPrefix + ',\'remove_passive\',{skill_id:\'' + esc(pal.passives[i]) + '\'})">x</button></span>';
+        }
+        html += '</div>';
+    }
+    html += '<div class="action-row"><select class="input" id="pm-add-passive" style="flex:1">';
+    var pKeys = Object.keys(state.passiveSkills).sort(function(a, b) {
+        return (state.passiveSkills[a].name || a).localeCompare(state.passiveSkills[b].name || b);
+    });
+    for (var pk = 0; pk < pKeys.length; pk++) {
+        if (pal.passives && pal.passives.indexOf(pKeys[pk]) >= 0) continue;
+        html += '<option value="' + esc(pKeys[pk]) + '">' + esc(state.passiveSkills[pKeys[pk]].name || pKeys[pk]) + '</option>';
+    }
+    html += '</select><button class="btn btn-sm" onclick="' + editPrefix + ',\'add_passive\',{skill_id:document.getElementById(\'pm-add-passive\').value})">Add</button></div></div>';
+
+    // Moves
+    html += '<div class="pm-edit-section"><div class="pm-edit-label">Equipped Moves</div>';
+    if (pal.equip_waza && pal.equip_waza.length > 0) {
+        html += '<div class="pal-editor-tags">';
+        for (var mi = 0; mi < pal.equip_waza.length; mi++) {
+            var sk = state.activeSkills[pal.equip_waza[mi]];
+            html += '<span class="pal-editor-tag">' + esc(sk ? sk.name : pal.equip_waza[mi]) +
+                '<button class="tag-remove" onclick="' + editPrefix + ',\'remove_move\',{waza_id:\'' + esc(pal.equip_waza[mi]) + '\'})">x</button></span>';
+        }
+        html += '</div>';
+    }
+    var availMoves = (pal.mastered_waza && pal.mastered_waza.length > 0) ? pal.mastered_waza : Object.keys(state.activeSkills);
+    html += '<div class="action-row"><select class="input" id="pm-add-move" style="flex:1">';
+    for (var mj = 0; mj < availMoves.length; mj++) {
+        if (pal.equip_waza && pal.equip_waza.indexOf(availMoves[mj]) >= 0) continue;
+        var msk = state.activeSkills[availMoves[mj]];
+        html += '<option value="' + esc(availMoves[mj]) + '">' + esc(msk ? msk.name : availMoves[mj]) + '</option>';
+    }
+    html += '</select><button class="btn btn-sm" onclick="' + editPrefix + ',\'add_move\',{waza_id:document.getElementById(\'pm-add-move\').value})">Add</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="' + editPrefix + ',\'clear_moves\')">Clear</button></div></div>';
+
+    // Friendship
+    html += '<div class="pm-edit-section">' +
+        '<div class="pm-edit-label">Friendship <span class="dim">(Rank ' + (pal.friendship_rank || 0) + ' | ' + (pal.friendship_point || 0) + ' pts)</span></div>' +
+        '<div class="action-row">' +
+            '<input type="number" id="pm-friend" class="input mono" value="100" min="1" style="width:80px">' +
+            '<button class="btn btn-sm" onclick="' + editPrefix + ',\'add_friendship\',{value:+document.getElementById(\'pm-friend\').value||100})">Add</button>' +
+        '</div></div>';
+
+    // Status
+    html += '<div class="pm-edit-section"><div class="pm-edit-label">Status</div><div class="pm-stats-grid">';
+    if (pal.physical_health != null) {
+        var hl = ['Healthy', 'Injured', 'Depressed'];
+        html += '<div class="pm-stat"><span>Health</span><span>' + (hl[pal.physical_health] || pal.physical_health) + '</span></div>';
+    }
+    if (pal.fullstomach_rate != null) html += '<div class="pm-stat"><span>Hunger</span><span class="mono">' + (pal.fullstomach_rate * 100).toFixed(0) + '%</span></div>';
+    if (pal.sanity_rate != null) html += '<div class="pm-stat"><span>Sanity</span><span class="mono">' + (pal.sanity_rate * 100).toFixed(0) + '%</span></div>';
+    html += '</div></div>';
+
+    return html;
+}
+
+async function pmEditPal(source, boxPage, slotIndex, action, extraParams) {
+    var playerName = state.selectedPlayer;
+    if (!playerName) { addLog('No player selected', 'err'); return; }
+
+    var body = { action: action, source: source };
+    if (source === 'box') {
+        body.box_page = boxPage;
+        body.slot_index = slotIndex;
+    } else {
+        body.pal_index = palManagerSelectedPal ? palManagerSelectedPal.index : 0;
+    }
+    if (extraParams) {
+        for (var k in extraParams) { body[k] = extraParams[k]; }
+    }
+
+    addLog('Pal Manager: ' + action + ' on ' + source + ' pal', 'info');
+    var result = await apiPost('/api/player/' + encodeURIComponent(playerName) + '/pal/edit', body);
+    if (result && result.success) {
+        addLog(result.message || 'OK', 'ok');
+    } else {
+        addLog('Failed: ' + (result ? result.message : 'No response'), 'err');
+    }
+    await loadPalManager(playerName, palManagerBoxPage);
+}
+
+function palManagerGoPage(page) {
+    if (!state.selectedPlayer) return;
+    palManagerBoxPage = page;
+    palManagerSelectedPal = null;
+    loadPalManager(state.selectedPlayer, page);
+}
+
+async function editPlayerStat(action, inputId) {
+    if (!state.selectedPlayer) { addLog('No player selected', 'err'); return; }
+    var body = { action: action, target_player: state.selectedPlayer };
+    if (inputId) {
+        var el = document.getElementById(inputId);
+        if (el) body.value = parseInt(el.value) || 0;
+    }
+    addLog('Player stat: ' + action, 'info');
+    var result = await apiPost('/api/player/stats/edit', body);
+    if (result && result.success) {
+        addLog(result.message || 'OK', 'ok');
+    } else {
+        addLog('Failed: ' + (result ? result.message : 'No response'), 'err');
     }
 }
 
@@ -533,6 +1176,46 @@ function updateSourceBadge() {
     }
 }
 
+function updateDiscoveryIndicator() {
+    const chip = document.getElementById('chip-discovery');
+    if (!chip) return;
+
+    // Only show when using MOD source
+    if (state.playerSource !== 'lua_mod') {
+        chip.style.display = 'none';
+        return;
+    }
+
+    chip.style.display = '';
+    const status = state.discoveryStatus;
+    const found = state.discoveryFound;
+    const total = state.discoveryTotal;
+
+    if (status === 'pending' || status === 'unknown') {
+        chip.className = 'chip disc-pending';
+        chip.textContent = 'DISC ...';
+        chip.title = 'Auto-discovery in progress — waiting for property scan';
+    } else if (status === 'ok' && total != null && total > 0) {
+        if (found === total) {
+            chip.className = 'chip disc-full';
+            chip.textContent = 'DISC ' + found + '/' + total;
+            chip.title = 'Auto-discovery complete — all ' + total + ' properties found';
+        } else if (found > 0) {
+            chip.className = 'chip disc-partial';
+            chip.textContent = 'DISC ' + found + '/' + total;
+            chip.title = 'Auto-discovery partial — ' + found + ' of ' + total + ' properties found. Check discovery-log.json for details.';
+        } else {
+            chip.className = 'chip disc-none';
+            chip.textContent = 'DISC 0/' + total;
+            chip.title = 'Auto-discovery found no matching properties. Check discovery-log.json for raw property lists.';
+        }
+    } else {
+        chip.className = 'chip disc-pending';
+        chip.textContent = 'DISC ?';
+        chip.title = 'Discovery status unknown';
+    }
+}
+
 function selectPlayer(name) {
     state.selectedPlayer = name;
     renderPlayers();
@@ -541,7 +1224,7 @@ function selectPlayer(name) {
 }
 
 function updateAllTargetDropdowns() {
-    const ids = ['give-target', 'spawn-target', 'tp-player', 'qt-player', 'world-target'];
+    const ids = ['give-target', 'spawn-target', 'tp-player', 'qt-player', 'stp-source', 'stp-dest', 'world-target'];
     ids.forEach(id => {
         const sel = document.getElementById(id);
         if (!sel) return;
@@ -1631,6 +2314,19 @@ function teleportPlayerToWaypoint() {
         'Teleporting ' + playerName + ' to ' + wp.name + '...');
 }
 
+function sendPlayerToPlayer() {
+    const srcSel = document.getElementById('stp-source');
+    const dstSel = document.getElementById('stp-dest');
+    const source = srcSel ? srcSel.value : '';
+    const dest = dstSel ? dstSel.value : '';
+    if (!source) { addLog('Select a source player', 'err'); return; }
+    if (!dest) { addLog('Select a destination player', 'err'); return; }
+    if (source === dest) { addLog('Source and destination are the same player', 'err'); return; }
+    sendCommand('send_player_to_player',
+        { source_player: source, target_player: dest },
+        'Sending ' + source + ' to ' + dest + '...');
+}
+
 function bringAllPlayers() {
     if (!confirm('Bring ALL players to your position?')) return;
     sendCommand('bring_all', {}, 'Bringing all players to admin...');
@@ -1910,7 +2606,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Target dropdown sync
-    const targetIds = ['give-target', 'spawn-target', 'tp-player', 'qt-player', 'world-target'];
+    const targetIds = ['give-target', 'spawn-target', 'tp-player', 'qt-player', 'stp-source', 'stp-dest', 'world-target'];
     targetIds.forEach(id => {
         const el = document.getElementById(id);
         if (el) {

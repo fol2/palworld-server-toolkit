@@ -1786,6 +1786,34 @@ select.input {
 /* MOD source badge */
 .chip.mod-src { border-color: rgba(75, 139, 245, 0.3); color: var(--blue); }
 
+/* Discovery indicator chip states */
+.chip.disc-full { border-color: rgba(52, 211, 153, 0.3); color: var(--green); }
+.chip.disc-partial { border-color: rgba(251, 191, 36, 0.3); color: var(--amber); }
+.chip.disc-none { border-color: rgba(248, 113, 113, 0.3); color: var(--red); }
+.chip.disc-pending {
+    border-color: rgba(120, 120, 160, 0.3);
+    color: var(--text-sec);
+    animation: disc-pulse 2s ease-in-out infinite;
+}
+
+@keyframes disc-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Discovery note in player detail panel */
+.pa-discovery-note {
+    font-size: 11px;
+    font-style: italic;
+    color: var(--text-muted);
+    padding: 6px 8px;
+    margin-top: 6px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--text-muted);
+    border-radius: 4px;
+}
+
 /* Player HP bar (inline in player list) */
 .player-hp-bar {
     display: flex;
@@ -1845,6 +1873,14 @@ select.input {
     background: var(--green);
     border-radius: 3px;
     transition: width 0.3s ease;
+}
+
+.pa-food-fill {
+    background: #e0a040;
+}
+
+.pa-san-fill {
+    background: #a080e0;
 }
 
 .pa-hp-text {
@@ -1989,6 +2025,203 @@ select.input {
     height: 100%;
     background: var(--green);
     border-radius: 2px;
+}
+
+/* ── Phase C: Pal Editor + Player Stats ─────────────────────────────────── */
+
+/* Pal card v2 (clickable, expandable) */
+.pa-pal-card-v2 {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    transition: border-color 0.15s;
+}
+.pa-pal-card-v2:hover { border-color: var(--border-light); }
+.pa-pal-card-v2.expanded { border-color: var(--accent); }
+.pa-pal-card-v2.dead { border-left: 3px solid var(--red); }
+
+.pal-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+.pal-card-header:hover { background: var(--bg-hover); }
+.pal-card-header .icon-thumb {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+}
+.pal-card-info { flex: 1; min-width: 0; }
+.pal-card-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.pal-card-name {
+    font-weight: 600;
+    font-size: 12px;
+}
+.pal-card-level {
+    color: var(--amber);
+    font-weight: 600;
+    font-size: 11px;
+    font-family: 'Fira Code', monospace;
+    flex-shrink: 0;
+}
+.pal-card-expand {
+    color: var(--text-muted);
+    font-size: 10px;
+    flex-shrink: 0;
+    width: 16px;
+    text-align: center;
+}
+.pal-card-stats {
+    display: flex;
+    gap: 8px;
+    font-size: 10px;
+    font-family: 'Fira Code', monospace;
+    color: var(--text-sec);
+    margin-top: 2px;
+}
+
+.pal-card-passives {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-top: 3px;
+}
+
+.pal-passive-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 500;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-light);
+    color: var(--text-sec);
+}
+
+.pal-rank-stars {
+    display: inline-flex;
+    gap: 1px;
+    margin-left: 2px;
+}
+.pal-rank-star {
+    color: var(--amber);
+    font-size: 10px;
+    line-height: 1;
+}
+.pal-dead-badge {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--red);
+    background: rgba(248, 113, 113, 0.12);
+    border: 1px solid rgba(248, 113, 113, 0.3);
+    padding: 0px 4px;
+    border-radius: 3px;
+    letter-spacing: 0.5px;
+}
+
+.pal-gender {
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+}
+.pal-gender.male { color: var(--blue); }
+.pal-gender.female { color: #F472B6; }
+
+/* Pal editor panel (expanded below card) */
+.pal-editor-panel {
+    padding: 10px 12px 12px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-panel);
+}
+
+.pal-editor-section {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+}
+.pal-editor-section:last-child { border-bottom: none; }
+
+.pal-editor-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+.pal-editor-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+.pal-editor-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-light);
+    color: var(--text);
+}
+
+.tag-remove {
+    background: none;
+    border: none;
+    color: var(--red);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+    opacity: 0.6;
+    font-family: inherit;
+}
+.tag-remove:hover { opacity: 1; }
+
+.pal-editor-hint {
+    font-size: 10px;
+    font-style: italic;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+/* Stat editor grid (shared by pal editor + player stats) */
+.stat-editor-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.stat-editor-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+}
+.stat-editor-row > span:first-child {
+    width: 60px;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-sec);
+    text-align: right;
+    letter-spacing: 0.3px;
+}
+
+.stat-editor-row .input {
+    font-size: 11px;
+    padding: 3px 6px;
 }
 
 /* ── Welcome Overlay ──────────────────────────────────────────────────────── */
@@ -2604,4 +2837,351 @@ select.input {
 .explorer-step-text strong {
     color: var(--text);
     font-weight: 500;
+}
+
+/* ── Pal Manager (Fullscreen Modal Overlay) ──────────────────────────────── */
+
+/* Prevent body scroll when modal open */
+body.pm-no-scroll { overflow: hidden; }
+
+/* Backdrop overlay */
+.pm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(4, 4, 8, 0.92);
+    backdrop-filter: blur(8px);
+    z-index: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+.pm-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Modal container */
+.pm-modal {
+    width: 94vw;
+    height: 90vh;
+    max-width: 1200px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-light);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+    transform: translateY(16px);
+    transition: transform 0.25s ease;
+    overflow: hidden;
+}
+
+.pm-overlay.open .pm-modal {
+    transform: translateY(0);
+}
+
+/* Header bar */
+.pm-modal-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--bg-surface);
+}
+
+.pm-modal-header h3 {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin: 0;
+}
+
+.pm-player-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-sec);
+}
+
+/* Two-pane body */
+.pm-modal-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+}
+
+/* Left pane — pal list */
+.pm-list-pane {
+    width: 340px;
+    min-width: 240px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 8px;
+    background: var(--bg);
+}
+
+/* Right pane — detail/editor */
+.pm-detail-pane {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+    min-width: 0;
+}
+
+/* Section labels inside list pane */
+.pm-section {
+    margin-bottom: 12px;
+}
+
+.pm-section-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    padding: 0 4px;
+}
+
+.pm-pal-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+/* Pal card in list */
+.pm-card {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.pm-card:hover {
+    background: var(--bg-hover);
+}
+
+.pm-card.selected {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+    border-left: 3px solid var(--accent);
+    padding-left: 5px;
+}
+
+.pm-card.dead {
+    opacity: 0.5;
+}
+
+.pm-card-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.pm-card-top {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.pm-card-name {
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pm-card-meta {
+    display: flex;
+    gap: 3px;
+    margin-top: 2px;
+    flex-wrap: wrap;
+}
+
+.pm-elem-badge {
+    font-size: 9px;
+    padding: 0 4px;
+    border-radius: 3px;
+    font-weight: 500;
+    line-height: 1.5;
+}
+
+.pm-card-level {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--amber);
+    font-family: 'Fira Code', monospace;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Pagination */
+.pm-pagination {
+    display: flex;
+    gap: 3px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+    padding: 0 4px;
+}
+
+/* Detail panel (right pane) */
+.pm-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.pm-detail-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.pm-detail-name {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.pm-detail-species {
+    font-size: 11px;
+    color: var(--text-sec);
+    margin-top: 2px;
+}
+
+.pm-edit-section {
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+.pm-edit-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.pm-edit-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+
+.pm-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 4px;
+}
+
+.pm-stat {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+.pm-stat span:first-child {
+    color: var(--text-sec);
+    font-weight: 500;
+}
+
+/* ── Pal Manager Responsive ──────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+    .pm-modal {
+        width: 100vw;
+        height: 100vh;
+        max-width: 100vw;
+        border-radius: 0;
+    }
+
+    .pm-modal-body {
+        flex-direction: column;
+    }
+
+    .pm-list-pane {
+        width: 100%;
+        min-width: 0;
+        max-height: 40vh;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .pm-detail-pane {
+        flex: 1;
+        min-height: 0;
+    }
+
+    .pm-detail-name {
+        font-size: 15px;
+    }
+
+    .pm-stats-grid {
+        grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+    }
+
+    .pm-modal-header {
+        padding: 10px 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .pm-modal-header h3 {
+        font-size: 10px;
+        letter-spacing: 1.5px;
+    }
+
+    .pm-player-name {
+        font-size: 11px;
+    }
+
+    .pm-list-pane {
+        max-height: 35vh;
+        padding: 6px;
+    }
+
+    .pm-detail-pane {
+        padding: 10px 12px;
+    }
+
+    .pm-card {
+        padding: 5px 6px;
+        gap: 6px;
+    }
+
+    .pm-card-name {
+        font-size: 11px;
+    }
+
+    .pm-detail-header {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .pm-stats-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .stat-editor-row {
+        flex-wrap: wrap;
+    }
 }

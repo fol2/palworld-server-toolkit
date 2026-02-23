@@ -48,6 +48,11 @@ $script:PartnerSkills = $null
 $script:LuaPlayersCache = $null
 $script:LuaPlayersCacheTime = [datetime]::MinValue
 
+# Discovery status cache (updated from Lua mod responses)
+$script:LuaDiscoveryStatus = "unknown"
+$script:LuaDiscoveryFound = $null
+$script:LuaDiscoveryTotal = $null
+
 # ── Icon mapping ────────────────────────────────────────────────────────────────
 function Build-IconMap {
     Write-Host "[LiveEditor] Building icon mapping..." -ForegroundColor Cyan
@@ -788,6 +793,35 @@ function Handle-Request {
             return
         }
 
+        if ($path -eq "/api/dump-functions" -and $method -eq "POST") {
+            $reader = New-Object System.IO.StreamReader($req.InputStream, $req.ContentEncoding)
+            $postBody = $reader.ReadToEnd()
+            $reader.Close()
+
+            $cmdData = $postBody | ConvertFrom-Json
+            $cmdId = "dumpfn_" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+
+            $params = @{}
+            foreach ($prop in $cmdData.PSObject.Properties) {
+                if ($null -ne $prop.Value) { $params[$prop.Name] = $prop.Value }
+            }
+
+            $result = Send-ModCommand -Id $cmdId -Type "dump_functions" -Params $params -TimeoutSec 10
+
+            $body = $result | ConvertTo-Json -Depth 6
+            Send-JsonResponse $rsp $body
+            return
+        }
+
+        if ($path -eq "/api/generate-sdk" -and $method -eq "POST") {
+            $cmdId = "gensdk_" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+            $result = Send-ModCommand -Id $cmdId -Type "generate_sdk" -Params @{} -TimeoutSec 30
+
+            $body = $result | ConvertTo-Json -Depth 3
+            Send-JsonResponse $rsp $body
+            return
+        }
+
         if ($path -eq "/api/probe" -and $method -eq "POST") {
             $reader = New-Object System.IO.StreamReader($req.InputStream, $req.ContentEncoding)
             $postBody = $reader.ReadToEnd()
@@ -804,6 +838,17 @@ function Handle-Request {
 
             $body = $result | ConvertTo-Json -Depth 5
             Send-JsonResponse $rsp $body
+            return
+        }
+
+        if ($path -eq "/api/discovery-log" -and $method -eq "GET") {
+            $logFile = Join-Path $script:IpcDir "discovery-log.json"
+            if (Test-Path $logFile) {
+                $body = Get-Content -Path $logFile -Raw -Encoding UTF8
+                Send-JsonResponse $rsp $body
+            } else {
+                Send-JsonResponse $rsp '{"error":"No discovery log found. Run Probe first."}'
+            }
             return
         }
 
@@ -851,6 +896,10 @@ function Handle-Request {
                             $script:LuaPlayersCache = $luaPlayers
                             $script:LuaPlayersCacheTime = Get-Date
                             $luaSource = $true
+                            # Cache discovery status fields
+                            $script:LuaDiscoveryStatus = if ($parsed.discovery) { $parsed.discovery } else { "unknown" }
+                            $script:LuaDiscoveryFound = $parsed.discovery_found
+                            $script:LuaDiscoveryTotal = $parsed.discovery_total
                         }
                     } catch {}
                 }
@@ -873,11 +922,16 @@ function Handle-Request {
                 $source = "lua_mod"
                 foreach ($lp in $luaPlayers) {
                     $entry = @{
-                        name        = $lp.name
-                        level       = $lp.level
-                        hp          = $lp.hp
-                        max_hp      = $lp.max_hp
-                        party_count = $lp.party_count
+                        name            = $lp.name
+                        level           = $lp.level
+                        hp_rate         = $lp.hp_rate
+                        attack          = $lp.attack
+                        defense         = $lp.defense
+                        fullstomach     = $lp.fullstomach
+                        max_fullstomach = $lp.max_fullstomach
+                        sanity          = $lp.sanity
+                        max_sanity      = $lp.max_sanity
+                        party_count     = $lp.party_count
                     }
                     # Merge REST data (ping, location)
                     foreach ($rp in $restPlayers) {
@@ -926,7 +980,13 @@ function Handle-Request {
                 } catch {}
             }
 
-            $body = @{ players = $merged; source = $source } | ConvertTo-Json -Depth 3
+            $body = @{
+                players         = $merged
+                source          = $source
+                discovery       = $script:LuaDiscoveryStatus
+                discovery_found = $script:LuaDiscoveryFound
+                discovery_total = $script:LuaDiscoveryTotal
+            } | ConvertTo-Json -Depth 3
             Send-JsonResponse $rsp $body
             return
         }
@@ -954,18 +1014,10 @@ function Handle-Request {
 
         if ($path -match '^/api/player/([^/]+)/pals$' -and $method -eq "GET") {
             $playerName = [System.Uri]::UnescapeDataString($Matches[1])
-            # Parse query params
-            $queryOffset = 0
-            $queryLimit = 30
-            $qs = $req.Url.Query
-            if ($qs -match 'offset=(\d+)') { $queryOffset = [int]$Matches[1] }
-            if ($qs -match 'limit=(\d+)') { $queryLimit = [int]$Matches[1] }
 
             $cmdId = "pals_" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
             $luaResult = Send-ModCommand -Id $cmdId -Type "get_player_pals" -Params @{
                 target_player = $playerName
-                offset = $queryOffset
-                limit = $queryLimit
             } -TimeoutSec 8
 
             if ($luaResult -and $luaResult.success) {
@@ -981,6 +1033,100 @@ function Handle-Request {
                 $body = @{ success = $false; message = if ($luaResult) { $luaResult.message } else { "No response" } } | ConvertTo-Json
                 Send-JsonResponse $rsp $body
             }
+            return
+        }
+
+        if ($path -match '^/api/player/([^/]+)/all-pals$' -and $method -eq "GET") {
+            $playerName = [System.Uri]::UnescapeDataString($Matches[1])
+            $qs = $req.QueryString
+            $page = if ($qs["page"]) { [int]$qs["page"] } else { 0 }
+            $pageSize = if ($qs["page_size"]) { [int]$qs["page_size"] } else { 30 }
+
+            $cmdId = "allpals_" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+            $luaResult = Send-ModCommand -Id $cmdId -Type "get_all_pals" -Params @{
+                target_player = $playerName
+                page = $page
+                page_size = $pageSize
+            } -TimeoutSec 10
+
+            if ($luaResult -and $luaResult.success) {
+                try {
+                    $parsed = $luaResult.message | ConvertFrom-Json
+                    $body = $parsed | ConvertTo-Json -Depth 5
+                    Send-JsonResponse $rsp $body
+                } catch {
+                    $body = @{ success = $false; message = "Parse error: $_" } | ConvertTo-Json
+                    Send-JsonResponse $rsp $body
+                }
+            } else {
+                $body = @{ success = $false; message = if ($luaResult) { $luaResult.message } else { "No response" } } | ConvertTo-Json
+                Send-JsonResponse $rsp $body
+            }
+            return
+        }
+
+        if ($path -match '^/api/player/([^/]+)/inventory$' -and $method -eq "GET") {
+            $playerName = [System.Uri]::UnescapeDataString($Matches[1])
+
+            $cmdId = "inv_" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+            $luaResult = Send-ModCommand -Id $cmdId -Type "get_player_inventory" -Params @{
+                target_player = $playerName
+            } -TimeoutSec 8
+
+            if ($luaResult -and $luaResult.success) {
+                try {
+                    $parsed = $luaResult.message | ConvertFrom-Json
+                    $body = $parsed | ConvertTo-Json -Depth 5
+                    Send-JsonResponse $rsp $body
+                } catch {
+                    $body = @{ success = $false; message = "Parse error: $_" } | ConvertTo-Json
+                    Send-JsonResponse $rsp $body
+                }
+            } else {
+                $body = @{ success = $false; message = if ($luaResult) { $luaResult.message } else { "No response" } } | ConvertTo-Json
+                Send-JsonResponse $rsp $body
+            }
+            return
+        }
+
+        if ($path -match '^/api/player/([^/]+)/pal/edit$' -and $method -eq "POST") {
+            $playerName = [System.Uri]::UnescapeDataString($Matches[1])
+            $reader = New-Object System.IO.StreamReader($req.InputStream, $req.ContentEncoding)
+            $postBody = $reader.ReadToEnd()
+            $reader.Close()
+
+            $cmdData = $postBody | ConvertFrom-Json
+            $cmdId = "paledit_" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+
+            $params = @{ target_player = $playerName }
+            foreach ($prop in $cmdData.PSObject.Properties) {
+                if ($null -ne $prop.Value) { $params[$prop.Name] = $prop.Value }
+            }
+
+            $result = Send-ModCommand -Id $cmdId -Type "edit_pal" -Params $params -TimeoutSec 8
+
+            $body = $result | ConvertTo-Json -Depth 3
+            Send-JsonResponse $rsp $body
+            return
+        }
+
+        if ($path -eq "/api/player/stats/edit" -and $method -eq "POST") {
+            $reader = New-Object System.IO.StreamReader($req.InputStream, $req.ContentEncoding)
+            $postBody = $reader.ReadToEnd()
+            $reader.Close()
+
+            $cmdData = $postBody | ConvertFrom-Json
+            $cmdId = "pstat_" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+
+            $params = @{}
+            foreach ($prop in $cmdData.PSObject.Properties) {
+                if ($null -ne $prop.Value) { $params[$prop.Name] = $prop.Value }
+            }
+
+            $result = Send-ModCommand -Id $cmdId -Type "edit_player_stats" -Params $params -TimeoutSec 8
+
+            $body = $result | ConvertTo-Json -Depth 3
+            Send-JsonResponse $rsp $body
             return
         }
 
@@ -1127,49 +1273,79 @@ function Handle-Request {
                 return
             }
 
-            # Get admin position from REST API
-            $restResult = $null
-            try {
-                $restResult = Invoke-RestApi -Endpoint "players"
-            } catch {}
+            # Get admin position — try Lua mod first (has X,Y,Z), fallback to REST API (X,Y only)
+            $adminX = $null
+            $adminY = $null
+            $adminZ = $null
+            $adminName = $null
 
-            if (-not $restResult -or -not $restResult.PSObject.Properties['players']) {
-                $body = @{ success = $false; message = "Cannot reach REST API to get player positions" } | ConvertTo-Json
-                Send-JsonResponse $rsp $body
-                return
-            }
-
-            # Find admin by UID from config
-            $adminUid = $null
-            if ($script:Config -and $script:Config.admin_uid) {
-                $adminUid = $script:Config.admin_uid
-            }
-
-            $adminPlayer = $null
-            foreach ($rp in $restResult.players) {
-                if ($adminUid -and $rp.player_id -eq $adminUid) {
-                    $adminPlayer = $rp
-                    break
+            # Attempt 1: Lua mod — get_admin_location returns precise X,Y,Z from pawn
+            $luaResult = Send-ModCommand -Id "savepos_$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())" -Type "get_admin_location" -TimeoutSec 3
+            if ($luaResult -and $luaResult.success) {
+                try {
+                    $locData = $luaResult.message | ConvertFrom-Json
+                    if ($null -ne $locData.x -and $null -ne $locData.y) {
+                        $adminX = [double]$locData.x
+                        $adminY = [double]$locData.y
+                        $adminZ = if ($null -ne $locData.z) { [double]$locData.z } else { 0 }
+                        $adminName = $locData.name
+                        Write-Host "[save-pos] Got location from Lua mod: X=$adminX Y=$adminY Z=$adminZ"
+                    }
+                } catch {
+                    Write-Host "[save-pos] Lua mod response parse error: $_"
                 }
             }
-            # Fallback: use first player if admin not found by UID
-            if (-not $adminPlayer -and $restResult.players.Count -gt 0) {
-                $adminPlayer = $restResult.players[0]
-            }
 
-            if (-not $adminPlayer -or $null -eq $adminPlayer.location_x) {
-                $body = @{ success = $false; message = "Admin player not found online or no location data" } | ConvertTo-Json
-                Send-JsonResponse $rsp $body
-                return
+            # Attempt 2: REST API fallback (no Z coordinate available)
+            if ($null -eq $adminX) {
+                $restResult = $null
+                try {
+                    $restResult = Invoke-RestApi -Endpoint "players"
+                } catch {}
+
+                if (-not $restResult -or -not $restResult.PSObject.Properties['players']) {
+                    $body = @{ success = $false; message = "Cannot reach Lua mod or REST API to get player positions" } | ConvertTo-Json
+                    Send-JsonResponse $rsp $body
+                    return
+                }
+
+                # Find admin by UID from config
+                $adminUid = $null
+                if ($script:Config -and $script:Config.admin_uid) {
+                    $adminUid = $script:Config.admin_uid
+                }
+
+                $adminPlayer = $null
+                foreach ($rp in $restResult.players) {
+                    if ($adminUid -and $rp.player_id -eq $adminUid) {
+                        $adminPlayer = $rp
+                        break
+                    }
+                }
+                # Fallback: use first player if admin not found by UID
+                if (-not $adminPlayer -and $restResult.players.Count -gt 0) {
+                    $adminPlayer = $restResult.players[0]
+                }
+
+                if (-not $adminPlayer -or $null -eq $adminPlayer.location_x) {
+                    $body = @{ success = $false; message = "Admin player not found online or no location data" } | ConvertTo-Json
+                    Send-JsonResponse $rsp $body
+                    return
+                }
+
+                $adminX = [double]$adminPlayer.location_x
+                $adminY = [double]$adminPlayer.location_y
+                $adminZ = if ($null -ne $adminPlayer.location_z) { [double]$adminPlayer.location_z } else { 0 }
+                Write-Host "[save-pos] Got location from REST API: X=$adminX Y=$adminY Z=$adminZ (Z may be 0)"
             }
 
             # Create waypoint from admin's position
             $newWp = @{
                 id       = "wp_" + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
                 name     = $wpName
-                x        = [double]$adminPlayer.location_x
-                y        = [double]$adminPlayer.location_y
-                z        = if ($null -ne $adminPlayer.location_z) { [double]$adminPlayer.location_z } else { 0 }
+                x        = $adminX
+                y        = $adminY
+                z        = $adminZ
                 category = $wpCategory
                 preset   = $false
                 created  = (Get-Date).ToString("yyyy-MM-dd")
@@ -1213,6 +1389,10 @@ function Handle-Request {
             $ext = [System.IO.Path]::GetExtension($filePath).ToLower()
             $contentType = if ($script:MimeTypes.ContainsKey($ext)) { $script:MimeTypes[$ext] } else { "application/octet-stream" }
             $rsp.ContentType = $contentType
+            # Prevent browser caching for dev files (HTML/JS/CSS)
+            if ($ext -in @(".html", ".js", ".css")) {
+                $rsp.Headers.Add("Cache-Control", "no-cache, no-store, must-revalidate")
+            }
 
             $bytes = [System.IO.File]::ReadAllBytes($filePath)
             $rsp.ContentLength64 = $bytes.Length

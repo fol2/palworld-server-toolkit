@@ -1,6 +1,7 @@
 /* ── UObject Explorer — LiveEditor Dev Tool ──────────────────────────────── */
 
 const explorerState = {
+    mode: 'properties', // 'properties' or 'functions'
     className: 'PalPlayerState',
     instanceIndex: 0,
     propertyPath: '',
@@ -11,6 +12,7 @@ const explorerState = {
     hintShown: false, // whether the post-dump drill hint has been shown
     probeResult: null, // cached probe discovery result
     probeDetailsOpen: false,
+    fnFilter: '',     // function name filter (case-insensitive)
 };
 
 /* ── API ──────────────────────────────────────────────────────────────────── */
@@ -28,6 +30,32 @@ async function apiDump(params) {
     }
 }
 
+async function apiDumpFunctions(params) {
+    try {
+        const res = await fetch('/api/dump-functions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params),
+        });
+        return await res.json();
+    } catch (e) {
+        return { success: false, message: 'HTTP error: ' + e.message };
+    }
+}
+
+async function apiGenerateSDK() {
+    try {
+        const res = await fetch('/api/generate-sdk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
+        });
+        return await res.json();
+    } catch (e) {
+        return { success: false, message: 'HTTP error: ' + e.message };
+    }
+}
+
 async function apiProbe(force) {
     try {
         const res = await fetch('/api/probe', {
@@ -38,6 +66,40 @@ async function apiProbe(force) {
         return await res.json();
     } catch (e) {
         return { success: false, message: 'HTTP error: ' + e.message };
+    }
+}
+
+/* ── Mode Toggle ──────────────────────────────────────────────────────────── */
+
+function setMode(mode) {
+    explorerState.mode = mode;
+    document.getElementById('mode-props').classList.toggle('active', mode === 'properties');
+    document.getElementById('mode-funcs').classList.toggle('active', mode === 'functions');
+    document.getElementById('filter-row').classList.toggle('visible', mode === 'functions');
+    document.getElementById('btn-gensdk').style.display = mode === 'functions' ? '' : 'none';
+
+    // Update main button text
+    const btn = document.getElementById('btn-dump');
+    btn.textContent = mode === 'properties' ? 'Dump Properties' : 'Dump Functions';
+}
+
+/* ── Generate SDK ─────────────────────────────────────────────────────────── */
+
+async function doGenerateSDK() {
+    const btn = document.getElementById('btn-gensdk');
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+    setStatus('Generating CXXHeaderDump (this may take a while)...', 'loading');
+
+    const result = await apiGenerateSDK();
+
+    btn.disabled = false;
+    btn.textContent = 'Gen SDK';
+
+    if (result && result.success) {
+        setStatus('SDK generated: ' + (result.message || 'Check ue4ss/CXXHeaderDump/'), 'ok');
+    } else {
+        setStatus('SDK generation failed: ' + (result ? result.message : 'No response'), 'err');
     }
 }
 
@@ -113,6 +175,13 @@ function renderProbePanel(data) {
         renderProbeBadge('pending', '0 FOUND');
     }
 
+    // Show timestamp if available (from saved log)
+    const ts = data.timestamp;
+    if (ts) {
+        const badge = document.getElementById('probe-badge');
+        badge.title = 'Last probed: ' + ts;
+    }
+
     // Build the detail grid
     let html = '';
     const friendlyNames = {
@@ -167,6 +236,13 @@ function toggleProbeDetails() {
 /* ── Main Dump ────────────────────────────────────────────────────────────── */
 
 async function doDump() {
+    if (explorerState.mode === 'functions') {
+        return doDumpFunctions();
+    }
+    return doDumpProperties();
+}
+
+async function doDumpProperties() {
     readControls();
 
     if (!explorerState.className) {
@@ -215,6 +291,66 @@ async function doDump() {
         renderInfo(data);
         renderProperties(data.properties || []);
         setStatus('OK — ' + (data.property_count || 0) + ' properties in ' + elapsed + 's', 'ok');
+        document.getElementById('status-time').textContent = new Date().toLocaleTimeString('en-GB');
+    } else {
+        const msg = result ? result.message : 'No response from server';
+        setStatus('Error: ' + msg, 'err');
+        renderError(msg);
+    }
+}
+
+/* ── Function Dump ────────────────────────────────────────────────────────── */
+
+async function doDumpFunctions() {
+    readControls();
+    explorerState.fnFilter = (document.getElementById('fn-filter').value || '').trim();
+
+    if (!explorerState.className) {
+        setStatus('Enter a class name', 'err');
+        return;
+    }
+
+    explorerState.loading = true;
+    setStatus('Dumping functions for ' + explorerState.className + '...', 'loading');
+    document.getElementById('btn-dump').disabled = true;
+
+    const t0 = performance.now();
+
+    const params = {
+        class_name: explorerState.className,
+        instance_index: explorerState.instanceIndex,
+        max_items: explorerState.maxItems,
+    };
+    if (explorerState.propertyPath) {
+        params.property_path = explorerState.propertyPath;
+    }
+    if (explorerState.fnFilter) {
+        params.filter = explorerState.fnFilter;
+    }
+
+    const result = await apiDumpFunctions(params);
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(2);
+
+    explorerState.loading = false;
+    document.getElementById('btn-dump').disabled = false;
+
+    if (result && result.success) {
+        let data;
+        try {
+            data = typeof result.message === 'string' ? JSON.parse(result.message) : result.message;
+        } catch (e) {
+            setStatus('Failed to parse response: ' + e.message, 'err');
+            renderError('Invalid JSON in response message: ' + esc(result.message));
+            return;
+        }
+
+        explorerState.lastResult = data;
+        explorerState.history = buildHistory();
+
+        renderBreadcrumb();
+        renderFunctionInfo(data);
+        renderFunctions(data.functions || []);
+        setStatus('OK — ' + (data.function_count || 0) + ' functions in ' + elapsed + 's', 'ok');
         document.getElementById('status-time').textContent = new Date().toLocaleTimeString('en-GB');
     } else {
         const msg = result ? result.message : 'No response from server';
@@ -341,6 +477,68 @@ function renderProperties(props) {
             '<td class="col-value ' + valueClass + (isDrillable ? ' drillable" onclick="drillInto(\'' + esc(p.name) + '\')"' : '"') +
                 ' title="' + esc(p.value) + '">' + esc(truncate(p.value, 120)) + '</td>' +
             '<td>' + drillBtn + '</td>' +
+            '</tr>';
+    }
+
+    html += '</tbody></table>';
+    el.innerHTML = html;
+}
+
+function renderFunctionInfo(data) {
+    const el = document.getElementById('results-info');
+    el.style.display = 'flex';
+    document.getElementById('info-class').textContent = 'Path: ' + (data.class || '?');
+    document.getElementById('info-instances').textContent = 'Instances: ' + (data.instance_count || '?');
+    document.getElementById('info-props').textContent = 'Functions shown: ' + (data.function_count || 0);
+}
+
+function renderFunctions(funcs) {
+    const el = document.getElementById('results');
+
+    if (funcs.length === 0) {
+        el.innerHTML = '<div class="empty-state">No functions found' +
+            (explorerState.fnFilter ? ' matching "' + esc(explorerState.fnFilter) + '"' : '') +
+            '.</div>';
+        return;
+    }
+
+    let html = '<table><thead><tr>' +
+        '<th>NAME</th><th>PARAMETERS</th><th>RETURN</th><th>FLAGS</th>' +
+        '</tr></thead><tbody>';
+
+    for (const fn of funcs) {
+        // Build params display
+        let paramsHtml = '';
+        if (fn.params && fn.params.length > 0) {
+            paramsHtml = fn.params.map(p => {
+                const cls = p.direction === 'out' ? 'param-out' : 'param-name';
+                const prefix = p.direction === 'out' ? 'out ' : '';
+                return '<span class="' + cls + '">' + prefix + esc(p.name) + '</span>' +
+                    '<span class="param-type">: ' + esc(p.type) + '</span>';
+            }).join(', ');
+        } else {
+            paramsHtml = '<span style="color:var(--text-muted)">none</span>';
+        }
+
+        // Build flags tags
+        let flagsHtml = '';
+        if (fn.flags) {
+            flagsHtml = fn.flags.split(', ').filter(Boolean).map(f => {
+                const cls = f.toLowerCase();
+                return '<span class="fn-tag ' + cls + '">' + esc(f) + '</span>';
+            }).join(' ');
+        }
+
+        // Return type
+        const retHtml = fn.return_type
+            ? '<span class="fn-return">' + esc(fn.return_type) + '</span>'
+            : '<span style="color:var(--text-muted)">void</span>';
+
+        html += '<tr>' +
+            '<td class="col-name" style="font-family:\'Fira Code\',monospace;font-size:11px">' + esc(fn.name) + '</td>' +
+            '<td class="fn-params">' + paramsHtml + '</td>' +
+            '<td>' + retHtml + '</td>' +
+            '<td>' + flagsHtml + '</td>' +
             '</tr>';
     }
 
@@ -557,6 +755,24 @@ function showExplorerGuide() {
     document.getElementById('results-info').style.display = 'none';
 }
 
+/* ── Load saved discovery log ─────────────────────────────────────────────── */
+
+async function loadSavedDiscoveryLog() {
+    try {
+        const res = await fetch('/api/discovery-log');
+        const data = await res.json();
+        if (data && data.properties && !data.error) {
+            explorerState.probeResult = data;
+            renderProbePanel(data);
+            const ts = data.timestamp ? ' (saved ' + data.timestamp + ')' : '';
+            setStatus('Loaded previous discovery results' + ts, 'ok');
+        }
+    } catch (e) {
+        // No saved log — that's fine, user needs to probe first
+    }
+}
+
 /* ── Initialisation ──────────────────────────────────────────────────────── */
 
 showExplorerGuide();
+loadSavedDiscoveryLog();

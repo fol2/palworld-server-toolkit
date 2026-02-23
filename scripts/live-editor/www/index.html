@@ -26,6 +26,7 @@
                 <span id="player-count">-/32</span>
             </span>
             <span class="chip" id="chip-source" title="Player data source — MOD (live UE4SS), REST (API), or RCON (legacy)"></span>
+            <span class="chip" id="chip-discovery" style="display:none" title="Auto-discovery status — how many UObject properties were found"></span>
             <a href="/explorer.html" class="chip" style="text-decoration:none;color:var(--purple)" title="UObject Explorer — dev tool for browsing live game objects">EXPLORER</a>
             <span class="chip" id="chip-mod" title="UE4SS mod status — required for Give/Spawn/Teleport commands"></span>
             <span class="chip help-btn" onclick="toggleHelp()" title="Help &amp; Reference (press ?)">?</span>
@@ -252,6 +253,12 @@
                         <label>Player<select id="tp-player" class="input"></select></label>
                         <label>Destination<select id="tp-waypoint" class="input"></select></label>
                         <button class="btn btn-accent full-w" onclick="teleportPlayerToWaypoint()" title="Admin goes to waypoint first, then brings the player to that location">Teleport Player</button>
+                    </div>
+                    <div class="panel">
+                        <div class="panel-head"><h3>SEND PLAYER TO PLAYER</h3></div>
+                        <label>Send<select id="stp-source" class="input"></select></label>
+                        <label>To<select id="stp-dest" class="input"></select></label>
+                        <button class="btn btn-accent full-w" onclick="sendPlayerToPlayer()" title="Teleport the first player directly to the second player's location (silent, no admin movement)">Send Player</button>
                     </div>
                     <div class="panel">
                         <div class="panel-head"><h3>QUICK TELEPORT</h3></div>

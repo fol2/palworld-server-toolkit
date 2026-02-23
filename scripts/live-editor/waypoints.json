@@ -1,34 +1,24 @@
 ﻿{
     "waypoints":  [
                       {
-                          "id":  "wp_1771722031621",
+                          "id":  "wp_1771808045051",
                           "category":  "custom",
                           "preset":  false,
-                          "created":  "2026-02-22",
-                          "z":  0,
-                          "x":  -368884.21875,
-                          "name":  "Home",
-                          "y":  224007.21875
-                      },
-                      {
-                          "id":  "wp_1771724939872",
-                          "category":  "custom",
-                          "preset":  false,
-                          "created":  "2026-02-22",
-                          "z":  0,
-                          "x":  -346395.375,
+                          "created":  "2026-02-23",
+                          "z":  4097.08,
+                          "x":  -346144.2,
                           "name":  "Eugnel Home",
-                          "y":  262812.28125
+                          "y":  262729.6
                       },
                       {
-                          "id":  "wp_1771787898873",
-                          "category":  "custom",
+                          "id":  "wp_1771808133858",
+                          "category":  "town",
                           "preset":  false,
-                          "created":  "2026-02-22",
-                          "z":  0,
-                          "x":  -345241.625,
-                          "name":  "death place",
-                          "y":  191997.09375
+                          "created":  "2026-02-23",
+                          "z":  -81.11,
+                          "x":  -370497.55,
+                          "name":  "Home",
+                          "y":  225026.96
                       }
                   ]
 }

@@ -10,6 +10,9 @@ tools/
 # Runtime data
 backups/
 logs/
+scripts/live-editor/discovery-log.json
+scripts/live-editor/commands.json
+scripts/live-editor/responses.json
 
 # User config (contains passwords)
 config.json
