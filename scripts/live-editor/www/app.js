@@ -1042,6 +1042,13 @@ function renderPalManagerDetail() {
     if (pal.craft_speed != null) html += '<div class="pm-stat"><span>SPD</span><span class="mono">' + pal.craft_speed + '</span></div>';
     html += '</div></div>';
 
+    // Level & Rank editors
+    html += '<div class="pm-edit-section"><div class="pm-edit-label">Level & Rank</div>' +
+        '<div class="stat-editor-grid">' +
+            '<div class="stat-editor-row"><span>Level</span><input type="number" id="pm-set-level" class="input mono" value="' + (pal.level || 1) + '" min="1" max="65" style="width:60px"><button class="btn btn-xs" onclick="' + editPrefix + ',\'set_level\',{value:+document.getElementById(\'pm-set-level\').value})">Set</button></div>' +
+            '<div class="stat-editor-row"><span>Rank \u2605</span><input type="number" id="pm-set-rank" class="input mono" value="' + (pal.rank || 0) + '" min="0" max="5" style="width:60px"><button class="btn btn-xs" onclick="' + editPrefix + ',\'set_rank\',{value:+document.getElementById(\'pm-set-rank\').value})">Set</button></div>' +
+        '</div></div>';
+
     // Stat Points
     html += '<div class="pm-edit-section">' +
         '<div class="pm-edit-label">Stat Points <span class="dim">(Unused: ' + (pal.unused_points || 0) + ')</span></div>' +
@@ -1100,6 +1107,33 @@ function renderPalManagerDetail() {
             '<input type="number" id="pm-friend" class="input mono" value="100" min="1" style="width:80px">' +
             '<button class="btn btn-sm" onclick="' + editPrefix + ',\'add_friendship\',{value:+document.getElementById(\'pm-friend\').value||100})">Add</button>' +
         '</div></div>';
+
+    // Work Suitability
+    var WS_TYPES = [
+        {id:0,name:'Kindling'},{id:1,name:'Watering'},{id:2,name:'Planting'},
+        {id:3,name:'Electricity'},{id:4,name:'Handiwork'},{id:5,name:'Gathering'},
+        {id:6,name:'Lumbering'},{id:7,name:'Mining'},{id:8,name:'Oil Extract'},
+        {id:9,name:'Medicine'},{id:10,name:'Cooling'},{id:11,name:'Transporting'},
+        {id:12,name:'Farming'}
+    ];
+    var wsMap = {};
+    if (pal.work_suitability) {
+        pal.work_suitability.forEach(function(ws) { wsMap[ws.id] = ws.rank; });
+    }
+    var hasWs = Object.keys(wsMap).length > 0;
+    html += '<div class="pm-edit-section"><div class="pm-edit-label">Work Suitability</div>';
+    html += '<div class="ws-grid">';
+    for (var wi = 0; wi < WS_TYPES.length; wi++) {
+        var wt = WS_TYPES[wi];
+        var curRank = wsMap[wt.id] || 0;
+        html += '<div class="ws-row' + (curRank > 0 ? ' ws-active' : '') + '">' +
+            '<span class="ws-name">' + wt.name + '</span>' +
+            '<span class="ws-rank mono">' + curRank + '</span>' +
+            '<input type="number" id="pm-ws-' + wt.id + '" class="input mono ws-input" value="' + curRank + '" min="0" max="5">' +
+            '<button class="btn btn-xs" onclick="' + editPrefix + ',\'set_work_suitability\',{work_type:' + wt.id + ',value:+document.getElementById(\'pm-ws-' + wt.id + '\').value})">Set</button>' +
+        '</div>';
+    }
+    html += '</div></div>';
 
     // Status
     html += '<div class="pm-edit-section"><div class="pm-edit-label">Status</div><div class="pm-stats-grid">';

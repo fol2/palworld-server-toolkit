@@ -3104,6 +3104,57 @@ body.pm-no-scroll { overflow: hidden; }
     font-weight: 500;
 }
 
+/* ── Work Suitability Grid ─────────────────────────────────────────────── */
+
+.ws-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px;
+}
+
+.ws-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    background: var(--bg-card);
+    opacity: 0.45;
+    transition: opacity 0.15s;
+}
+.ws-row:hover { opacity: 1; }
+.ws-row.ws-active {
+    opacity: 1;
+    background: color-mix(in srgb, var(--accent) 8%, var(--bg-card));
+}
+
+.ws-name {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-sec);
+    font-weight: 500;
+}
+.ws-active .ws-name { color: var(--text-primary); }
+
+.ws-rank {
+    font-size: 11px;
+    min-width: 14px;
+    text-align: center;
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.ws-input {
+    width: 36px !important;
+    font-size: 10px !important;
+    padding: 1px 3px !important;
+    text-align: center;
+}
+
 /* ── Pal Manager Responsive ──────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
@@ -3183,5 +3234,9 @@ body.pm-no-scroll { overflow: hidden; }
 
     .stat-editor-row {
         flex-wrap: wrap;
+    }
+
+    .ws-grid {
+        grid-template-columns: 1fr;
     }
 }

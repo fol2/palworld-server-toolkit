@@ -2095,53 +2095,165 @@ end
 
 -- ── Helper: read all stats from a pal's IndividualParameter ──────────────────
 -- Reusable by CmdGetPlayerPals, CmdGetAllPals, etc.
--- Convert UE4SS FName/FString/enum to Lua string. Returns nil if garbage.
+
+-- Convert UE4SS FName/FString/enum/RemoteUnrealParam to Lua string.
+-- Handles: string, number, FName userdata, RemoteUnrealParam wrappers.
 local function UEStringify(val)
     if val == nil then return nil end
     if type(val) == "string" then
-        if val == "" or string.find(val, "UObject") or string.find(val, "RemoteUnreal") then return nil end
+        if val == "" then return nil end
+        -- Filter obvious garbage representations
+        if string.find(val, "UObject:") or string.find(val, "RemoteUnrealParam:") then return nil end
         return val
     end
     if type(val) == "number" then return tostring(val) end
-    -- Try :ToString() (works on FName/FString userdata)
-    local ok1, s1 = pcall(function() return val:ToString() end)
-    if ok1 and type(s1) == "string" and s1 ~= "" and not string.find(s1, "UObject") and not string.find(s1, "RemoteUnreal") then
-        return s1
+
+    -- For userdata: try :get() unwrap first (RemoteUnrealParam → inner value)
+    local inner = val
+    pcall(function()
+        local unwrapped = val:get()
+        if unwrapped ~= nil then inner = unwrapped end
+    end)
+
+    -- Try :ToString() on the unwrapped value (works for FName)
+    local ok1, s1 = pcall(function() return inner:ToString() end)
+    if ok1 and type(s1) == "string" and s1 ~= "" then
+        if not string.find(s1, "UObject:") and not string.find(s1, "RemoteUnrealParam:") then
+            return s1
+        end
     end
-    -- Try tostring() (last resort)
-    local ok2, s2 = pcall(function() return tostring(val) end)
-    if ok2 and type(s2) == "string" and s2 ~= "" and not string.find(s2, "UObject") and not string.find(s2, "RemoteUnreal") then
-        return s2
+
+    -- Try :ToString() on original val (in case :get() changed type)
+    if inner ~= val then
+        local ok2, s2 = pcall(function() return val:ToString() end)
+        if ok2 and type(s2) == "string" and s2 ~= "" then
+            if not string.find(s2, "UObject:") and not string.find(s2, "RemoteUnrealParam:") then
+                return s2
+            end
+        end
+    end
+
+    -- Last resort: tostring()
+    local ok3, s3 = pcall(function() return tostring(inner) end)
+    if ok3 and type(s3) == "string" and s3 ~= "" then
+        if not string.find(s3, "UObject:") and not string.find(s3, "RemoteUnrealParam:")
+           and not string.find(s3, "userdata:") then
+            return s3
+        end
     end
     return nil
 end
 
--- Iterate a UE4SS TArray and return Lua table of strings (via UEStringify).
--- Tries ipairs first, then :Num()/:Get(i), then ForEach.
-local function UEArrayToStrings(arr)
-    if not arr then return {} end
+-- Read a TArray<FName> or TArray<Enum> from a UFunction return value.
+-- UE4SS issue #397: UFunction TArray returns are stack-allocated, causing
+-- dangling pointers. We must read elements IMMEDIATELY before Lua GC.
+-- Tries 7 methods in order, returns (results_table, debug_string).
+local function UEArrayToStrings(arr, debugLabel)
+    if not arr then return {}, "nil" end
     local results = {}
-    -- Method 1: ipairs (works for many TArray types in UE4SS)
-    local ok1 = pcall(function()
+    local dbg = {}
+    local arrType = type(arr)
+    table.insert(dbg, "type=" .. arrType)
+
+    -- Method 1: Already a plain Lua table (TArray outparam unwrap)
+    if arrType == "table" then
+        for _, v in ipairs(arr) do
+            local s = UEStringify(v)
+            if s then table.insert(results, s) end
+        end
+        table.insert(dbg, "table#=" .. #results)
+        return results, table.concat(dbg, ",")
+    end
+
+    -- Method 2: ForEach with :get() unwrap (best for UFunction returns)
+    -- elem:get() unwraps RemoteUnrealParam → FName, then :ToString()
+    pcall(function()
+        arr:ForEach(function(index, elem)
+            pcall(function()
+                local inner = elem:get()
+                if inner then
+                    local s = nil
+                    pcall(function() s = inner:ToString() end)
+                    if s and s ~= "" and not string.find(s, "RemoteUnrealParam:") then
+                        table.insert(results, s)
+                    end
+                end
+            end)
+        end)
+    end)
+    if #results > 0 then
+        table.insert(dbg, "ForEach#=" .. #results)
+        return results, table.concat(dbg, ",")
+    end
+    table.insert(dbg, "ForEach=0")
+
+    -- Method 3: #arr (UE4SS __len) + arr[i] with :get() unwrap
+    results = {}
+    pcall(function()
+        local len = #arr
+        table.insert(dbg, "len=" .. len)
+        for i = 0, len - 1 do
+            pcall(function()
+                local elem = arr[i]
+                local s = UEStringify(elem)
+                if s then table.insert(results, s) end
+            end)
+        end
+    end)
+    if #results > 0 then
+        table.insert(dbg, "idx#=" .. #results)
+        return results, table.concat(dbg, ",")
+    end
+
+    -- Method 4: :GetArrayNum() + arr[i]
+    results = {}
+    local ganOk, ganVal = pcall(function() return arr:GetArrayNum() end)
+    if ganOk and type(ganVal) == "number" and ganVal > 0 then
+        table.insert(dbg, "GAN=" .. ganVal)
+        for i = 0, ganVal - 1 do
+            pcall(function()
+                local elem = arr[i]
+                local s = UEStringify(elem)
+                if s then table.insert(results, s) end
+            end)
+        end
+        if #results > 0 then
+            table.insert(dbg, "GAN#=" .. #results)
+            return results, table.concat(dbg, ",")
+        end
+    end
+
+    -- Method 5: ipairs on userdata
+    results = {}
+    pcall(function()
         for _, v in ipairs(arr) do
             local s = UEStringify(v)
             if s then table.insert(results, s) end
         end
     end)
-    if ok1 and #results > 0 then return results end
-    -- Method 2: :Num() + :Get(i)
-    results = {}
+    if #results > 0 then
+        table.insert(dbg, "ipairs#=" .. #results)
+        return results, table.concat(dbg, ",")
+    end
+
+    -- Method 6: pairs() to discover structure
+    local pairsInfo = {}
     pcall(function()
-        local count = arr:Num()
-        for i = 0, count - 1 do
-            pcall(function()
-                local v = arr:Get(i)
+        local n = 0
+        for k, v in pairs(arr) do
+            n = n + 1
+            if n <= 3 then
                 local s = UEStringify(v)
+                table.insert(pairsInfo, tostring(k) .. "=" .. (s or tostring(v)))
                 if s then table.insert(results, s) end
-            end)
+            end
         end
+        table.insert(dbg, "pairs=" .. n)
     end)
-    return results
+    if #results > 0 then return results, table.concat(dbg, ",") end
+
+    table.insert(dbg, "EMPTY")
+    return results, table.concat(dbg, ",")
 end
 
 local function ReadPalStats(param)
@@ -2167,23 +2279,132 @@ local function ReadPalStats(param)
         else entry.gender = UEStringify(gt) end
     end)
 
-    -- Passive skills (TArray<FName>)
+    -- ── Passive skills (TArray<FName>) ──
+    -- UE4SS issue #397: UFunction TArray returns are dangling pointers.
+    -- Try chained ForEach (no intermediate variable) first, then fallback.
+    local passiveDbg = "not-called"
     pcall(function()
-        local list = UEArrayToStrings(param:GetPassiveSkillList())
-        if #list > 0 then entry.passives = list end
+        -- Method A: Chained ForEach on return value (stack still valid)
+        local skills = {}
+        local chainOk = pcall(function()
+            param:GetPassiveSkillList():ForEach(function(index, elem)
+                pcall(function()
+                    local inner = elem:get()
+                    if inner then
+                        local s = nil
+                        pcall(function() s = inner:ToString() end)
+                        if s and s ~= "" and not string.find(s, "RemoteUnrealParam:") then
+                            table.insert(skills, s)
+                        end
+                    end
+                end)
+            end)
+        end)
+        if chainOk and #skills > 0 then
+            entry.passives = skills
+            passiveDbg = "chain#=" .. #skills
+        else
+            -- Method B: Store then iterate (may have dangling pointer issue)
+            local rawArr = param:GetPassiveSkillList()
+            local list, dbg = UEArrayToStrings(rawArr, "passives")
+            passiveDbg = (chainOk and "chain=0," or "chain=FAIL,") .. dbg
+            if #list > 0 then entry.passives = list end
+        end
     end)
 
-    -- Equipped waza (TArray<EPalWazaID>)
+    -- ── Equipped waza (TArray<EPalWazaID>) ──
+    local wazaDbg = "not-called"
     pcall(function()
-        local list = UEArrayToStrings(param:GetEquipWaza())
-        if #list > 0 then entry.equip_waza = list end
+        local skills = {}
+        local chainOk = pcall(function()
+            param:GetEquipWaza():ForEach(function(index, elem)
+                pcall(function()
+                    local inner = elem:get()
+                    if inner then
+                        local s = nil
+                        pcall(function() s = inner:ToString() end)
+                        if not s or s == "" then
+                            -- Enum values might be numbers
+                            pcall(function() s = tostring(inner) end)
+                        end
+                        if s and s ~= "" and not string.find(s, "RemoteUnrealParam:") then
+                            table.insert(skills, s)
+                        end
+                    end
+                end)
+            end)
+        end)
+        if chainOk and #skills > 0 then
+            entry.equip_waza = skills
+            wazaDbg = "chain#=" .. #skills
+        else
+            local rawArr = param:GetEquipWaza()
+            local list, dbg = UEArrayToStrings(rawArr, "equip_waza")
+            wazaDbg = (chainOk and "chain=0," or "chain=FAIL,") .. dbg
+            if #list > 0 then entry.equip_waza = list end
+        end
     end)
 
-    -- Mastered waza (TArray<EPalWazaID>)
+    -- ── Mastered waza ──
     pcall(function()
-        local list = UEArrayToStrings(param:GetMasteredWaza())
-        if #list > 0 then entry.mastered_waza = list end
+        local skills = {}
+        local chainOk = pcall(function()
+            param:GetMasteredWaza():ForEach(function(index, elem)
+                pcall(function()
+                    local inner = elem:get()
+                    if inner then
+                        local s = nil
+                        pcall(function() s = inner:ToString() end)
+                        if not s or s == "" then
+                            pcall(function() s = tostring(inner) end)
+                        end
+                        if s and s ~= "" and not string.find(s, "RemoteUnrealParam:") then
+                            table.insert(skills, s)
+                        end
+                    end
+                end)
+            end)
+        end)
+        if chainOk and #skills > 0 then
+            entry.mastered_waza = skills
+        else
+            local rawArr = param:GetMasteredWaza()
+            local list = UEArrayToStrings(rawArr, "mastered_waza")
+            if #list > 0 then entry.mastered_waza = list end
+        end
     end)
+
+    -- Debug info (logged in CmdGetAllPals for first pal)
+    entry._passiveDbg = passiveDbg
+    entry._wazaDbg = wazaDbg
+
+    -- ── Work Suitability ranks ──
+    -- EPalWorkSuitability enum values (0-12)
+    local workTypes = {
+        {id = 0,  key = "EmitFlame",          name = "Kindling"},
+        {id = 1,  key = "Watering",           name = "Watering"},
+        {id = 2,  key = "Seeding",            name = "Planting"},
+        {id = 3,  key = "GenerateElectricity", name = "Electricity"},
+        {id = 4,  key = "Handcraft",          name = "Handiwork"},
+        {id = 5,  key = "Collection",         name = "Gathering"},
+        {id = 6,  key = "Deforest",           name = "Lumbering"},
+        {id = 7,  key = "Mining",             name = "Mining"},
+        {id = 8,  key = "OilExtraction",      name = "Oil Extraction"},
+        {id = 9,  key = "ProductMedicine",    name = "Medicine"},
+        {id = 10, key = "Cool",               name = "Cooling"},
+        {id = 11, key = "Transport",          name = "Transporting"},
+        {id = 12, key = "MonsterFarm",        name = "Farming"},
+    }
+    local wsRanks = {}
+    for _, wt in ipairs(workTypes) do
+        pcall(function()
+            local rank = param:GetWorkSuitabilityRank(wt.id)
+            if type(rank) == "number" and rank > 0 then
+                table.insert(wsRanks, { id = wt.id, key = wt.key, name = wt.name, rank = rank })
+            end
+        end)
+    end
+    if #wsRanks > 0 then entry.work_suitability = wsRanks end
 
     -- ── Core stats (UFunction getters — return simple int/float, always reliable) ──
     pcall(function() entry.level = param:GetLevel() end)
@@ -2434,44 +2655,69 @@ local function CmdGetAllPals(params)
         table.insert(partyDebug, "pawn=NONE")
     end
 
+    -- ── Method A: FindAllOf holders, match by owner name ──
     if pawn then
-        -- Find holder via FindAllOf + owner match
+        local pawnName = nil
+        pcall(function() pawnName = pawn:GetFullName() end)
+        table.insert(partyDebug, "pawnName=" .. tostring(pawnName))
+
         local holder = nil
         pcall(function()
             local allHolders = FindAllOf("PalOtomoHolderComponentBase")
             if allHolders then
                 table.insert(partyDebug, "FindAllOf=" .. #allHolders)
-                for _, h in ipairs(allHolders) do
+                for idx, h in ipairs(allHolders) do
                     local ownerOk, owner = pcall(function() return h:GetOwner() end)
-                    if ownerOk and owner and owner == pawn then
-                        holder = h
-                        table.insert(partyDebug, "holder=FindAllOf-match")
-                        break
+                    if ownerOk and owner then
+                        -- Try reference equality first
+                        if owner == pawn then
+                            holder = h
+                            table.insert(partyDebug, "holder=ref-match#" .. idx)
+                            break
+                        end
+                        -- Try name match as fallback
+                        if pawnName then
+                            local ownerName = nil
+                            pcall(function() ownerName = owner:GetFullName() end)
+                            if ownerName and ownerName == pawnName then
+                                holder = h
+                                table.insert(partyDebug, "holder=name-match#" .. idx)
+                                break
+                            end
+                        end
                     end
                 end
             else
                 table.insert(partyDebug, "FindAllOf=nil")
             end
         end)
-        -- Fallback: direct property
+
+        -- Fallback: direct property on pawn
         if not holder then
             for _, prop in ipairs({"OtomoHolderComponent", "OtomoHolder", "PartyComponent"}) do
                 local ok, val = pcall(function() return pawn[prop] end)
                 if ok and val then
-                    holder = val
-                    table.insert(partyDebug, "holder=prop:" .. prop)
-                    break
+                    -- Validate the holder by trying a safe call
+                    local countOk, countVal = pcall(function() return val:GetOtomoCount() end)
+                    if countOk and type(countVal) == "number" then
+                        holder = val
+                        table.insert(partyDebug, "holder=prop:" .. prop .. "(count=" .. countVal .. ")")
+                        break
+                    else
+                        table.insert(partyDebug, "holder=prop:" .. prop .. "(INVALID)")
+                    end
                 end
             end
-        end
-        if not holder then
-            table.insert(partyDebug, "holder=NONE")
         end
 
         if holder then
             local count = 0
-            pcall(function() count = holder:GetOtomoCount() end)
-            table.insert(partyDebug, "count=" .. tostring(count))
+            local countOk, countErr = pcall(function() count = holder:GetOtomoCount() end)
+            if not countOk then
+                table.insert(partyDebug, "count=ERR:" .. string.sub(tostring(countErr), 1, 80))
+            else
+                table.insert(partyDebug, "count=" .. tostring(count))
+            end
             if count > 5 then count = 5 end
             local maxSlots = count > 0 and count or 5
 
@@ -2492,9 +2738,67 @@ local function CmdGetAllPals(params)
                     table.insert(partyPals, palEntry)
                 elseif i < count then
                     table.insert(partyDebug, "slot" .. i .. "=FAIL:" .. tostring(slotErr))
+                end
+            end
+        else
+            table.insert(partyDebug, "holder=NONE")
+        end
+    end
+
+    -- ── Method B: OtomoData → CharacterContainerManager (alternative path) ──
+    if #partyPals == 0 then
+        local containerDebug = {}
+        pcall(function()
+            local otomoData = ps.OtomoData
+            if not otomoData then table.insert(containerDebug, "OtomoData=nil"); return end
+            table.insert(containerDebug, "OtomoData=ok")
+
+            local containerId = otomoData.OtomoCharacterContainerId
+            if not containerId then table.insert(containerDebug, "containerId=nil"); return end
+            table.insert(containerDebug, "containerId=ok")
+
+            -- Find the container manager
+            local managers = FindAllOf("PalCharacterContainerManager")
+            if not managers or #managers == 0 then
+                table.insert(containerDebug, "ContainerMgr=nil")
+                return
+            end
+            table.insert(containerDebug, "ContainerMgr=" .. #managers)
+
+            local mgr = managers[1]
+            -- Try GetContainer(containerId) UFunction
+            local container = nil
+            pcall(function() container = mgr:GetContainer(containerId) end)
+            if not container then
+                table.insert(containerDebug, "GetContainer=nil")
+                return
+            end
+            table.insert(containerDebug, "container=ok")
+
+            local num = 0
+            pcall(function() num = container:Num() end)
+            table.insert(containerDebug, "num=" .. tostring(num))
+
+            for i = 0, num - 1 do
+                local palEntry = { index = i, source = "party" }
+                pcall(function()
+                    local slot = container:Get(i)
+                    if not slot then return end
+                    local handle = slot:GetHandle()
+                    if not handle then return end
+                    local param = handle:TryGetIndividualParameter()
+                    if not param then return end
+                    local stats = ReadPalStats(param)
+                    for k, v in pairs(stats) do palEntry[k] = v end
+                end)
+                if palEntry.character_id then
                     table.insert(partyPals, palEntry)
                 end
             end
+            table.insert(containerDebug, "pals=" .. #partyPals)
+        end)
+        if #containerDebug > 0 then
+            table.insert(partyDebug, "MethodB:" .. table.concat(containerDebug, "|"))
         end
     end
 
@@ -2547,6 +2851,12 @@ local function CmdGetAllPals(params)
         end
     else
         Log("get_all_pals: PalStorage not found on PlayerState")
+    end
+
+    -- Log passives/waza debug from first box pal (for diagnostics)
+    if #boxPals > 0 and boxPals[1]._passiveDbg then
+        Log(string.format("get_all_pals: passives_dbg=%s | waza_dbg=%s",
+            tostring(boxPals[1]._passiveDbg), tostring(boxPals[1]._wazaDbg)))
     end
 
     Log(string.format("get_all_pals[%s]: %d party, %d box (page %d/%d)",
@@ -2774,6 +3084,35 @@ local function CmdEditPal(params)
         end)
         if callOk then ok = true; resultMsg = "Set WorkSpeed rank to " .. value .. " (experimental)"
         else resultMsg = "SetOtomoPalWorkSpeedRank failed: " .. tostring(callErr) end
+
+    elseif action == "set_level" then
+        local value = tonumber(params.value) or 1
+        if value < 1 then value = 1 end
+        if value > 65 then value = 65 end
+        local callOk, callErr = pcall(function()
+            ExecuteInGameThread(function()
+                param:SetOverrideLevel(value)
+            end)
+        end)
+        if callOk then ok = true; resultMsg = "Set level to " .. value
+        else resultMsg = "SetOverrideLevel failed: " .. tostring(callErr) end
+
+    elseif action == "set_work_suitability" then
+        -- Set work suitability add rank for a specific work type
+        -- params: work_type (EPalWorkSuitability enum int 0-12), value (int rank)
+        local workType = tonumber(params.work_type)
+        local value = tonumber(params.value) or 0
+        if not workType then return false, "Missing work_type (0-12)" end
+        local callOk, callErr = pcall(function()
+            ExecuteInGameThread(function()
+                param:SetWorkSuitabilityAddRank(workType, value)
+            end)
+        end)
+        local workNames = {"Kindling","Watering","Planting","Electricity","Handiwork",
+            "Gathering","Lumbering","Mining","Oil","Medicine","Cooling","Transporting","Farming"}
+        local wName = workNames[(workType or 0) + 1] or tostring(workType)
+        if callOk then ok = true; resultMsg = "Set " .. wName .. " suitability rank to " .. value
+        else resultMsg = "SetWorkSuitabilityAddRank failed: " .. tostring(callErr) end
     end
 
     local palIdStr = source == "box"
